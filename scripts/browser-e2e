@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Real Chromium cookie and cross-site email-link navigation against local peers.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+command -v chromium >/dev/null
+command -v node >/dev/null
+chromium --version
+node --version
+scripts/with-postgres.sh sh -c 'cd apps/passwordless_demo && gleam run -m browser_e2e'

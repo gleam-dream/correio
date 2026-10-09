@@ -1,0 +1,37 @@
+name: Pinned consumer siblings
+description: Check out public Warden composition dependencies at recorded revisions.
+runs:
+  using: composite
+  steps:
+    - name: Read pinned revisions
+      id: pins
+      shell: bash
+      working-directory: correio
+      run: |
+        set -euo pipefail
+        while IFS='=' read -r package revision; do
+          case "$package" in warden|sinal|http_gun) ;; *) echo 'Invalid sibling package' >&2; exit 1 ;; esac
+          [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || { echo 'Invalid sibling revision' >&2; exit 1; }
+          printf '%s=%s\n' "$package" "$revision" >> "$GITHUB_OUTPUT"
+        done < sibling-revisions.txt
+        for package in warden sinal http_gun; do
+          [[ $(grep -c "^$package=" sibling-revisions.txt) == 1 ]] || { echo 'Missing or duplicate sibling pin' >&2; exit 1; }
+        done
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        repository: gleam-dream/warden
+        ref: ${{ steps.pins.outputs.warden }}
+        path: warden
+        persist-credentials: false
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        repository: gleam-dream/sinal
+        ref: ${{ steps.pins.outputs.sinal }}
+        path: sinal
+        persist-credentials: false
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        repository: gleam-dream/http_gun
+        ref: ${{ steps.pins.outputs.http_gun }}
+        path: http_gun
+        persist-credentials: false

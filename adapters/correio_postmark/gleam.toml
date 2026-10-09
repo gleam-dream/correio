@@ -1,0 +1,16 @@
+name = "correio_postmark"
+version = "0.1.0"
+target = "erlang"
+gleam = ">= 1.18.0"
+licences = ["Apache-2.0"]
+description = "Postmark delivery for Correio with caller-owned HTTP Gun resources."
+repository = { type = "github", user = "gleam-dream", repo = "correio" }
+[dependencies]
+correio = { path = "../.." }
+http_gun = { path = "../../../http_gun" }
+gleam_stdlib = ">= 0.70.0 and < 2.0.0"
+gleam_http = ">= 4.4.0 and < 5.0.0"
+gleam_json = ">= 3.1.0 and < 4.0.0"
+gleam_time = ">= 1.11.0 and < 2.0.0"
+[dev-dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"

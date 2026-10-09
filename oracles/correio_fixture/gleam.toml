@@ -1,0 +1,11 @@
+name = "correio_oracle_fixture"
+version = "0.1.0"
+target = "erlang"
+
+[dependencies]
+correio = { path = "../.." }
+correio_postgres = { path = "../../adapters/correio_postgres" }
+gleam_stdlib = ">= 0.70.0 and < 2.0.0"
+gleam_json = ">= 3.0.0 and < 4.0.0"
+gleam_erlang = ">= 1.0.0 and < 2.0.0"
+pog = "== 4.1.0"

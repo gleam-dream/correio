@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+for package in . adapters/correio_postgres adapters/correio_postmark adapters/correio_mailbox apps/passwordless_demo; do
+  (
+    cd "$package"
+    gleam format --check src test
+    gleam build --warnings-as-errors
+  )
+done
+shellcheck scripts/check scripts/e2e scripts/with-postgres.sh scripts/oracles scripts/benchmark scripts/browser-e2e oracles/run.sh benchmarks/run.sh
+ruff check oracles/*.py benchmarks/*.py
+ruff format --check oracles/*.py benchmarks/*.py
+(cd oracles && python3 -m unittest test_comparison.py)
+scripts/e2e

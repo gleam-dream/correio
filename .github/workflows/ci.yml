@@ -1,0 +1,97 @@
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Native checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: correio
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: correio
+          persist-credentials: false
+      - uses: ./correio/.github/actions/siblings
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
+        with:
+          extra_nix_config: experimental-features = nix-command flakes
+      - name: Record source revisions
+        run: |
+          mkdir -p build/ci
+          { git rev-parse HEAD; cat sibling-revisions.txt; } > build/ci/revisions.txt
+      - name: Run native gate
+        run: |
+          set -o pipefail
+          nix develop -c scripts/check 2>&1 | tee build/ci/native.log
+      - name: Retain native evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: correio-native-evidence
+          path: correio/build/ci/
+          if-no-files-found: error
+          retention-days: 14
+
+  design:
+    name: Formatting and design
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
+      - run: nix flake check
+      - run: nix run .#design-gate-check -- docs/design .
+
+  oracles:
+    name: Pinned upstream comparisons
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: correio
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: correio
+          persist-credentials: false
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
+      - name: Compare actual implementations
+        run: |
+          mkdir -p build/ci
+          set -o pipefail
+          CORREIO_ORACLE_RESULTS="$PWD/build/ci/oracles" nix develop -c scripts/oracles 2>&1 | tee build/ci/oracles.log
+      - name: Retain comparison evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: correio-oracle-evidence
+          path: correio/build/ci/
+          if-no-files-found: error
+          retention-days: 14
+
+  ci:
+    name: CI
+    if: always()
+    needs: [gate, design, oracles]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require every mandatory job
+        env:
+          NATIVE: ${{ needs.gate.result }}
+          DESIGN: ${{ needs.design.result }}
+          ORACLES: ${{ needs.oracles.result }}
+        run: test "$NATIVE" = success && test "$DESIGN" = success && test "$ORACLES" = success

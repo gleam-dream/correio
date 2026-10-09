@@ -1,0 +1,34 @@
+{
+  "swoosh": {
+    "version": "1.28.1",
+    "revision": "13f10492615cbb9c29cc974f14e18e1c26a551b5",
+    "source": "https://github.com/swoosh/swoosh",
+    "license": "MIT",
+    "license_file": "licenses/swoosh-MIT.txt",
+    "execution": "Swoosh.Email construction and Swoosh.Adapters.SMTP.deliver/2 observed through loopback SMTP MAIL FROM, RCPT TO, and DATA",
+    "fixtures": "fixtures/email.json"
+  },
+  "phoenix": {
+    "version": "1.8.15",
+    "revision": "bd1801833b4fd7ceb02497cc7ba2d05e9bd391c8",
+    "source": "https://github.com/phoenixframework/phoenix",
+    "license": "MIT",
+    "license_file": "licenses/phoenix-MIT.txt",
+    "execution": "EEx-rendered upstream phx.gen.auth templates on PostgreSQL",
+    "files": {
+      "vendor/phoenix/context_functions.ex.eex": "0a818348e1cb25666dcd6859e99a865f2e4b214008e71ddfac248933f223c5cc",
+      "vendor/phoenix/schema.ex.eex": "f3a79eee63c2b3ff6e373135129238f3f3dfceeb20b4029b28288f90ebd3b592",
+      "vendor/phoenix/schema_token.ex.eex": "218427ef8bdd761afdd8d08995aaa1911d427281f3fce72da873fdf05fcf99ec"
+    }
+  },
+  "ash_authentication": {
+    "version": "4.15.0",
+    "revision": "d6b2be35cf8f0b8ab84e7a934cfb0d91de0a3c17",
+    "source": "https://github.com/team-alembic/ash_authentication",
+    "license": "MIT",
+    "license_file": "licenses/ash-authentication-MIT.txt",
+    "copyright": "2022 Alembic Pty Ltd",
+    "execution": "AshAuthentication.Strategy.MagicLink.request_token_for/2 and Actions.sign_in/3",
+    "reference_test": "test/ash_authentication/single_use_token_concurrency_test.exs"
+  }
+}

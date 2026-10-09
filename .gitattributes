@@ -1,0 +1,3 @@
+*.pdf binary
+# Preserve byte-for-byte upstream license notices, including their whitespace.
+oracles/licenses/* -whitespace

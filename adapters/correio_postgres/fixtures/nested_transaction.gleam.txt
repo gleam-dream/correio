@@ -1,0 +1,6 @@
+import correio_postgres
+import pog
+
+pub fn cannot_transfer_transaction_ownership(connection: pog.Connection) {
+  correio_postgres.new(connection, correio_postgres.Codec(fn(a) { a }, fn(a) { Ok(a) }))
+}
