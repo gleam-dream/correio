@@ -7,7 +7,7 @@ description = "Postmark delivery for Correio with caller-owned HTTP Gun resource
 repository = { type = "github", user = "gleam-dream", repo = "correio" }
 [dependencies]
 correio = { path = "../.." }
-http_gun = { path = "../../../http_gun" }
+http_gun = { git = "https://github.com/gleam-dream/http_gun.git", ref = "e4f00b8525e20a7b568b2cd585fe4e37db161b26" }
 gleam_stdlib = ">= 0.70.0 and < 2.0.0"
 gleam_http = ">= 4.4.0 and < 5.0.0"
 gleam_json = ">= 3.1.0 and < 4.0.0"
