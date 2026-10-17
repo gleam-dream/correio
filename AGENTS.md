@@ -12,7 +12,7 @@
 
 ## Tooling
 
-- `nix develop` supplies Gleam, Erlang/OTP 28, rebar3, Elixir, Python, PostgreSQL, Node, and lefthook. Linux shells also supply Chromium for browser checks.
+- `nix develop` supplies Gleam, Erlang/OTP 29, rebar3, Elixir, Python, PostgreSQL, Node, and lefthook. Linux shells also supply Chromium for browser checks.
 - `nix develop -c scripts/check` runs the package's fast executable gate.
 - `nix fmt -- PATH...` formats named files. `nix flake check` checks formatting.
 - The pre-commit hook formats and re-stages staged files.

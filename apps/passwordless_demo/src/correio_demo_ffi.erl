@@ -23,7 +23,7 @@ stop({State, Listener, Listen}) ->
   gen_tcp:close(Listen),
   receive {'DOWN', ListenerRef, process, Listener, _} -> ok
   after 100 -> exit(Listener, kill), receive {'DOWN', ListenerRef, process, Listener, _} -> ok end end,
-  catch gen_server:stop(State, normal, 5000),
+  try gen_server:stop(State, normal, 5000) catch _:_ -> ok end,
   receive {'DOWN', StateRef, process, State, _} -> {ok, nil}
   after 5000 -> {error, nil} end.
 
@@ -31,7 +31,7 @@ watch_lifetime(State, Listener, Listen) ->
   StateRef = monitor(process, State), ListenerRef = monitor(process, Listener),
   receive
     {'DOWN', StateRef, process, State, _} -> gen_tcp:close(Listen), exit(Listener, shutdown);
-    {'DOWN', ListenerRef, process, Listener, _} -> catch gen_server:stop(State, normal, 5000)
+    {'DOWN', ListenerRef, process, Listener, _} -> try gen_server:stop(State, normal, 5000) catch _:_ -> ok end
   end.
 init({Owner, State, Handler}) -> {ok, {monitor(process, Owner), State, Handler}}.
 handle_call({admin, Function}, _From, {Owner, State, Handler}) ->

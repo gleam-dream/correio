@@ -73,7 +73,7 @@ deliver(Parent, Ref, Socket, From, To, Raw) ->
     after
         %% Closing is cleanup and cannot invalidate an acceptance receipt.
         %% gen_smtp close sends QUIT without awaiting its acknowledgement.
-        catch gen_smtp_client:close(Socket)
+        try gen_smtp_client:close(Socket) catch _:_ -> ok end
     end.
 
 delivery_failure({_, <<"4",_/binary>>}, _) -> {refused,temporary};
