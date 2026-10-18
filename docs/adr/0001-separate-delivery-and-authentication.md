@@ -1,4 +1,4 @@
-# ADR 0001: Separate delivery and authentication
+# Correio separates email delivery from passwordless verification
 
 <a id="adr-0001"></a>
 
@@ -11,10 +11,10 @@
 ## Rationale and alternatives
 
 - Email delivery is reusable outside authentication. Putting delivery inside Warden would couple provider configuration and message content to OIDC lifetimes.
-- Phoenix supplies a useful sequential authentication reference. AshAuthentication supplies concurrent single-use evidence. Swoosh supplies normalized email semantics. Each oracle applies only to its stated comparison.
 - Warden's existing verified identity requires an ID token. Its design also records an unresolved consumption-time expiry boundary. Reusing those contracts unchanged would misstate local email authentication evidence.
+- A generic compare-and-set store would leave expiry sampling and attempt accounting to each caller. The semantic store port makes the serialization boundary part of the contract.
 
-## Provenance
+## Consequences
 
-- On 9 October 2026 UTC, the repository owner requested the new package under its original name, `ecarta`, ecosystem development setup, implementation of the proposed composition diagram, oracle comparisons, benchmarks, and end-to-end tests.
-- The preceding research inspected Swoosh 1.28.1, Phoenix 1.8.15, and AshAuthentication 4.15.0. Executable oracle manifests retain exact revisions and licenses.
+- Neither context imports the other, and no transaction spans them. A failure between issuing a challenge and delivering its message is an application concern.
+- The consumption-time expiry boundary stays open as a ruling in the design's pending ledger.

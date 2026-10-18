@@ -1,4 +1,4 @@
-# ADR 0002: Development mailbox inspection
+# Development mailbox inspection reads a caller-owned capture
 
 <a id="adr-0002"></a>
 
