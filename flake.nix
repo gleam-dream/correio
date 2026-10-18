@@ -88,6 +88,7 @@
               elixirPackage
               actionlint
               shellcheck
+              ripgrep
               ruff
               # Disposable clusters for atomic challenge storage and fault tests.
               postgresql_16
