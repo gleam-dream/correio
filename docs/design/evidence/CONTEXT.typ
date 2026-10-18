@@ -20,11 +20,6 @@
     body: [A fresh PostgreSQL cluster created for one check and discarded afterward. No check uses an existing database.],
   ),
   (
-    slug: "term-sibling-revision-pin",
-    title: [Sibling revision pin],
-    body: [An exact commit of a sibling repository (Warden, Sinal, HTTP Gun) recorded in the pin file for composition evidence.],
-  ),
-  (
     slug: "term-usage-example",
     title: [Usage example],
     body: [Runnable code that demonstrates one documented usage topic and is compiled and executed by the repository gate.],

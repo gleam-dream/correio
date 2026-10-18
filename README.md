@@ -113,7 +113,7 @@ Every topic below is code that compiles and runs in the repository gate, so it s
 | [`correio_mailbox`](adapters/correio_mailbox)   | Read-only development inbox and safe formatting preview         |
 | [`passwordless_demo`](apps/passwordless_demo)   | Local browser flow and application-native Warden composition    |
 
-- The core package uses Hex dependencies. The Postmark adapter and example use sibling checkouts of [HTTP Gun](https://github.com/gleam-dream/http_gun), [Sinal](https://github.com/gleam-dream/sinal), and [Warden](https://github.com/gleam-dream/warden), pinned in `sibling-revisions.txt`.
+- The core package uses Hex dependencies. The Postmark adapter and example depend on the unpublished [HTTP Gun](https://github.com/gleam-dream/http_gun) and [Warden](https://github.com/gleam-dream/warden) as Git dependencies on `main`; their `manifest.toml` files lock the resolved revisions.
 
 ## Development
 

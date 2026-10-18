@@ -28,7 +28,7 @@
 - `nix fmt -- PATH...` formats named files, `nix flake check` checks formatting, and the pre-commit hook formats and re-stages staged files.
 - `nix run .#design-gate-render -- docs/design docs/design/design-layer.pdf` renders the design, and `nix run .#design-gate-check -- docs/design .` checks render freshness and design integrity.
 - After authoring the design, run context estimation and a selected section export. Run layer operations sequentially because they share `.render`.
-- CI pins sibling checkouts in `sibling-revisions.txt`. Update a pin when a sibling's public contract changes, and never restore a shared compiled dependency cache.
+- Unpublished sibling packages (HTTP Gun and Warden, with what they pull in) are Git dependencies on `main`; each `manifest.toml` is the lock. Update one by hand with `gleam update <package>` when its public contract changes. CI never restores a shared compiled dependency cache.
 - Use repository-scoped Git only. Preserve sibling repositories and unrelated work.
 
 <!-- agent-skills:begin -->
