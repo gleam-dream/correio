@@ -10,6 +10,14 @@
     #principle(title: "Make illegal authentication states unrepresentable")[Opaque challenge and evidence values cannot be constructed through the public API. Closed results separate refusal from infrastructure failure.]
   ])
 
+  #pending-ledger(
+    pending-entry(
+      title: "Recovery, retention, and revocation rules are unchecked",
+      kind: "verify",
+      since: "2026-10-17",
+    )[The defaults, ranges, and capacities were compared with the code. The recovery, retention, revocation, and clock-discipline rules carried over from retired guides remain unchecked against the code.],
+  )
+
   #section(title: "System at a glance", lead: "The application issues and verifies challenges through one service over an injected store. The service never sends email.", visual: diagram(
     altitude: "L3", viewpoint: "runtime", title: "Passwordless components",
     nodes: (

@@ -21,4 +21,4 @@
 | Vendored upstream oracle sources and their licenses (`oracles/vendor`, `oracles/licenses`)                                                             | out-of-scope   | Upstream files retained byte-for-byte for the pinned oracle                                         |
 
 - Captured identifies intended ownership. It does not claim that implementation or validation has completed.
-- Unbuilt or undecided items appear in the pending ledgers of the [delivery](design/delivery/design.typ#pending-updates) and [root](design/design.typ#pending-updates) design documents.
+- Unbuilt, undecided, or unchecked items appear in the pending ledgers of the [root](design/design.typ), [delivery](design/delivery/design.typ), [passwordless](design/passwordless/design.typ), and [browser demo](design/demo/design.typ) design documents.

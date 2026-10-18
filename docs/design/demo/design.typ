@@ -10,6 +10,14 @@
     #principle(title: "The application owns browser policy")[Origin, cookies, framing, referrer policy, admission limits, and sessions belong to the application. The library never infers them from an email address.]
   ])
 
+  #pending-ledger(
+    pending-entry(
+      title: "Browser flow rules beyond the bounds are unchecked",
+      kind: "verify",
+      since: "2026-10-17",
+    )[The admission limits, state bounds, and cookie attributes were compared with the code. The landing, confirmation, cross-device, and recovery rules carried over from retired guides remain unchecked against the code and the browser check.],
+  )
+
   #section(title: "System at a glance", lead: "The demo composes delivery and passwordless verification into one browser journey.", visual: diagram(
     altitude: "L3", viewpoint: "runtime", title: "Browser demo composition",
     nodes: (

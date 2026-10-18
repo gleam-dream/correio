@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-- Correio owns transactional message construction, delivery evidence, and independent passwordless challenge verification. Applications own accounts, registration, permission decisions, browser routes, and sessions.
+- Correio owns transactional message construction, delivery outcomes, and independent passwordless challenge verification. Applications own accounts, registration, permission decisions, browser routes, and sessions.
 - Read `docs/design/design.typ`, the relevant `docs/design/<context>/design.typ` and `CONTEXT.typ`, `docs/COVERAGE.md`, and the relevant ADRs before changing a public contract.
 - Keep the design layer timeless. Record decisions and history in ADRs, and preserve unresolved requirements in the native pending ledger.
 - Exercise public APIs from the separate `apps/passwordless_demo` package with ordinary use, advanced configuration, application-native types, and recovery. Each usage topic is a runnable example there.

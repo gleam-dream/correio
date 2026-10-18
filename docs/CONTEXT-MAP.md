@@ -2,7 +2,7 @@
 
 ## Contexts
 
-- [Delivery](design/delivery/CONTEXT.typ) owns message construction, transports, delivery evidence, capture, and the development mailbox.
+- [Delivery](design/delivery/CONTEXT.typ) owns message construction, transports, delivery outcomes, capture, and the development mailbox.
 - [Passwordless](design/passwordless/CONTEXT.typ) owns challenges, consumption, verification evidence, recovery, and challenge stores.
 - [Browser demo](design/demo/CONTEXT.typ) owns the browser journey that composes delivery and verification into one login example.
 - [Evidence](design/evidence/CONTEXT.typ) owns oracles, scripted peers, usage examples, benchmarks, and continuous integration.

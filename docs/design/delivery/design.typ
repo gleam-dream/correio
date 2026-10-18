@@ -3,23 +3,26 @@
 #let accent = "blue"
 #let body = [
   #section(title: "Foundation", lead: "Delivery constructs one validated message, submits it through a selected transport, and reports what the transport observed.", body: [
-    #goal(title: "Compose transactional email without provider coupling")[A caller constructs one validated message and selects a transport while retaining provider-specific capabilities and delivery evidence.]
+    #goal(title: "Compose transactional email without provider coupling")[A caller constructs one validated message and selects a transport while retaining provider-specific capabilities and delivery outcomes.]
     #goal(title: "Inspect captured mail while testing a flow")[A test or developer reads the exact messages an application sent, without a provider, a global mailbox, or an automatic link activation.]
     #no-goal(title: "Schedule, store, or reconcile deliveries")[Delivery scheduling, durable outboxes, bounce processing, provider reconciliation, and inbound mail remain application integrations.]
     #invariant(title: "Possible transmission cannot become proven non-delivery", enforcement: "mechanism")[An uncertain transport outcome remains uncertain. Neither an adapter nor the library retries after possible transmission.]
     #invariant(title: "Admission precedes submission", enforcement: "mechanism")[A message that violates a structural, capability, or size requirement is refused before any provider request occurs.]
-    #principle(title: "Report evidence, never inbox delivery")[Every outcome states what the library observed. No outcome claims that a message reached an inbox.]
+    #principle(title: "Report what was observed, never inbox delivery")[Every outcome states what the library observed. No outcome claims that a message reached an inbox.]
   ])
 
-  #section(title: "Pending updates", lead: "Open decisions that the delivery design runs ahead of.", body: [
-    #pending-ledger(
-      pending-entry(
-        title: "Qualify the Postmark adapter against a live account",
-        kind: "ruling",
-        since: "2026-10-17",
-      )[Local scripted peers exercise the adapter. Whether to run an owner-credentialed live acceptance check is an open owner decision.],
-    )
-  ])
+  #pending-ledger(
+    pending-entry(
+      title: "Qualify the Postmark adapter against a live account",
+      kind: "ruling",
+      since: "2026-10-17",
+    )[Local scripted peers exercise the adapter. Whether to run an owner-credentialed live acceptance check is an open owner decision.],
+    pending-entry(
+      title: "Behavior rules beyond numeric bounds are unchecked",
+      kind: "verify",
+      since: "2026-10-17",
+    )[The message, Postmark, mailbox, and capture bounds were compared with the code. The address and MIME rules, the SMTP and Postmark exchange behavior, and the mailbox preview rules carried over from retired guides remain unchecked against the code.],
+  )
 
   #section(title: "System at a glance", lead: "A message flows from the application through one sender to a provider. Capture replaces the provider in tests.", visual: diagram(
     altitude: "L3", viewpoint: "runtime", title: "Delivery components",
@@ -44,7 +47,7 @@
     #md-table(3, (
       [Package or module], [Owned contract], [Effect owner],
       [correio/address, message, mime], [Immutable construction, admission, and serialization], [No network or database effects],
-      [correio/smtp], [Typed SMTP sender and delivery evidence], [One bounded SMTP exchange per submission],
+      [correio/smtp], [Typed SMTP sender and delivery outcome], [One bounded SMTP exchange per submission],
       [correio/capture and testing], [Recorded messages, checkpoints, and flow helpers], [Explicitly started capture runtime],
       [adapters/correio_postmark], [Postmark request and response semantics], [Caller-owned HTTP Gun client],
       [adapters/correio_mailbox], [Read-only development inspection], [Caller-owned capture and HTTP server],
@@ -61,14 +64,34 @@
     )
     #points([Addresses support ASCII dot-atom local parts and domain names. Local-part case is preserved and domain case is normalized. Unicode display names are supported through MIME encoding.], [Quoted local parts, address literals, and SMTPUTF8 mailboxes are refused. An adapter and encoding contract would have to support them first.], [Plain text and HTML can coexist as multipart alternatives. Attachments carry bytes, content type, filename, and attachment or inline disposition; inline content has a content identifier. The envelope sender may differ from the visible From address.], [MIME supports text, HTML, alternatives, inline resources, and binary attachments. Attachment media types under message or multipart are refused because they require additional encoding semantics.], [MIME uses CRLF, encoded Unicode headers, correctly escaped display names, stable multipart nesting, and a transfer encoding suitable for arbitrary attachment bytes. Generated date, message identifier, and multipart boundaries are independently normalized for comparisons.], [Custom header values preserve ASCII syntax, including structured unsubscribe headers. Non-ASCII custom values and physical header lines over 998 bytes are refused. Custom headers cannot override envelope, structural, authentication, or MIME headers; subjects and display names retain Unicode support.])
     #md-table(3, (
-      [Value], [Parts and refinement], [Relationship],
+      [Value object], [Parts and refinement], [Relationship],
       [Address], [ASCII dot-atom mailbox, normalized domain, optional Unicode display name], [A message has one sender and one or more recipients],
-      [Message], [Sender, recipients by role, subject, body, optional reply-to, headers, and attachments], [One immutable message derives one envelope],
       [Body], [Text, HTML, or both nonempty alternatives], [A message has one body value],
       [Attachment], [Filename, media type, bytes, and file or inline disposition], [A message has zero or more attachments; inline disposition has one content identifier],
       [Envelope], [Sender and unique mailbox recipients, including blind recipients], [Display names do not change recipient identity],
-      [Delivery evidence], [Accepted receipt, proven no-send, definite rejection, or unknown outcome], [One submission yields one observed outcome],
     ))
+    #subsection(title: "Delivery entities")[
+      #entity(title: "Message", description: [One immutable email value: sender, recipients by role, subject, body, headers, and attachments. It derives one envelope and performs no I/O.], kind: "aggregate", owner: "Message model", lifecycle: "immutable", domain: "Delivery", tint: "blue")[
+        #attribute(name: "Participants", type: "Addresses by role", provenance: "authored")[the sender, the To, Cc, and Bcc recipients, the optional reply-to address, and the envelope sender the application states]
+        #attribute(name: "Content", type: "Subject and body alternatives", provenance: "authored")[the subject and the text, HTML, or alternative body the application states]
+        #attribute(name: "Custom headers", type: "Name and value pairs", provenance: "authored")[ASCII header values that cannot override structural headers]
+        #attribute(name: "Envelope", type: "Sender and unique mailbox recipients", provenance: "derived")[computed from the participants, and including the blind recipients that the serialized headers omit]
+        #relates(cardinality: "1 : 0..n")[holds zero or more *Attachment* values]
+        #relates(cardinality: "1 : 1")[derives one *Envelope*]
+      ]
+      #entity(title: "Delivery outcome", description: [The closed result of one submission, stating what the library observed about transmission.], kind: "event", owner: "Transport and evidence", lifecycle: "immutable", domain: "Delivery", tint: "blue")[
+        #attribute(name: "Variant", type: "Delivery outcome kind", provenance: "observed")[accepted, not sent, rejected, or unknown, decided by the provider response or the transport fault]
+        #attribute(name: "Receipt", type: "Optional provider identifier and accepted recipients", provenance: "observed")[present only when the provider accepted the submission]
+        #attribute(name: "Reason", type: "Failure class or rejection class", provenance: "observed")[a failure class for a not-sent outcome, and temporary or permanent for a rejected outcome]
+        #relates(cardinality: "n : 1")[reports on one submission of one *Message*]
+      ]
+      #entity(title: "Capture", description: [An explicitly started, bounded runtime that records complete messages for inspection while testing. It performs no network I/O.], kind: "entity", owner: "Development mailbox and flow tests", lifecycle: "stateful", domain: "Delivery", tint: "blue")[
+        #attribute(name: "Capacity", type: "Count of retained messages from 1 to 10,000", provenance: "authored")[the bound the application sets when it starts the capture]
+        #attribute(name: "Retained entries", type: "Entries with increasing identifiers", provenance: "observed")[appended as the application's capture sender runs, and never renumbered after a clear]
+        #relates(cardinality: "1 : 0..n")[retains zero or more *Message* values as entries]
+        #relates(cardinality: "1 : 0..n")[is read through *Checkpoint* values that each bind it]
+      ]
+    ]
     #points([Defaults admit 100 recipients, 50 custom headers, 8 KiB per header value, 1 MiB of combined body content, 10 MiB per attachment, and 25 MiB of submission preparation. Configuration can lower or explicitly raise these bounds.], [A conservative encoded-size estimate runs before serialization and the exact encoded size is checked afterward. A message can therefore be refused even when its exact wire size would fit.], [A provider capability that a message needs but an adapter lacks fails explicitly rather than silently dropping the field.])
     #behavior(title: "Blind recipients stay private", area: "Message construction", level: "boundary")[#given[A message includes blind recipients.] #when[The application prepares it for delivery.] #then[The delivery envelope includes those recipients.] #then[The serialized message excludes the blind-recipient header.]]
     #behavior(title: "Invalid content is refused before submission", area: "Message admission", level: "boundary")[#given[A message violates a structural or configured size requirement.] #when[The application requests delivery.] #then[Delivery returns a typed refusal.] #then[No provider request occurs.]]
@@ -76,11 +99,11 @@
 
   #section(title: "Transport and evidence", lead: "A transport submits one admitted message and returns observed evidence. A provider acceptance is not inbox delivery.", body: [
     #answers(title: "Delivery operation",
-      responsibility: [Submit one admitted message and retain #term("term-delivery-evidence").],
+      responsibility: [Submit one admitted message and report its #term("term-delivery-outcome").],
       interface: [A #term("term-sender") accepting one message; SMTP, HTTP-provider, and capture implementations carry validated configuration and provider-specific options.],
       interactions: [The caller owns HTTP pools and scheduling. SMTP owns only its admitted exchange. Capture state has explicit ownership and bounded capacity.],
       invariants: [A provider acceptance receipt is not inbox delivery. Possible submission is not retried internally. #adr(8) Per-operation deadlines and input bounds limit retained work.],
-      failure: [Construction refusal, proven no-send, definite provider rejection, accepted submission, and unknown outcome are distinguishable. Unsupported features fail before submission.],
+      failure: [Accepted, not sent, rejected, and unknown outcomes are distinguishable, and a construction refusal is a not-sent outcome. Unsupported features fail before submission.],
     )
     #state-type(id: "delivery-outcome-kind", title: "Delivery outcome kind", variants: (
       (id: "accepted", description: [The provider accepted the submission.]),

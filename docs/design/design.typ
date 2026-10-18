@@ -7,21 +7,19 @@
     #no-goal(title: "Own accounts or application sessions")[Registration, account linking, business permissions, browser cookies, account discovery responses, and session publication remain application responsibilities.]
     #no-goal(title: "Operate an inbound mailbox or identity provider")[IMAP, POP, inbound mail processing, OAuth authorization-server behavior, WebAuthn, and authenticator TOTP are outside this package's contract.]
     #invariant(title: "Ordinary diagnostics exclude secrets", enforcement: "mechanism")[Descriptions and observations exclude provider credentials, challenge answers, message bodies, arbitrary application subjects, and raw foreign errors. Explicit delivery and VM inspection are outside that boundary.]
-    #invariant(title: "Delivery and verification share no authority", enforcement: "mechanism")[Verification never sends email and delivery never consumes a challenge. Neither context imports the other, and no shared transaction spans them.]
+    #invariant(title: "Delivery and verification share no authority", enforcement: "convention")[Verification never sends email and delivery never consumes a challenge. Neither context imports the other, and no shared transaction spans them.]
     #principle(title: "Keep ownership visible")[Constructors validate without starting processes. Runtime handles have explicit start and stop boundaries; injected pools and stores remain caller-owned.]
     #principle(title: "Preserve application-native values")[Typed subjects and provider extensions compose through public contracts without importing implementation modules.]
   ])
 
-  #section(title: "Pending updates", lead: "Open decisions that the design cannot settle alone.", body: [
-    #pending-ledger(
-      pending-entry(
-        title: "Warden consumption-time expiry boundary",
-        kind: "ruling",
-        since: "2026-10-09",
-        adr: [#adr(1)],
-      )[Warden's verified identity requires an ID token, and its design leaves a consumption-time expiry boundary unresolved. Whether email evidence should share that boundary is an open owner decision.],
-    )
-  ])
+  #pending-ledger(
+    pending-entry(
+      title: "Warden consumption-time expiry boundary",
+      kind: "ruling",
+      since: "2026-10-09",
+      adr: [#adr(1)],
+    )[Warden's verified identity requires an ID token, and its design leaves a consumption-time expiry boundary unresolved. Whether email evidence should share that boundary is an open owner decision.],
+  )
 
   #section(title: "System at a glance", lead: "Message delivery and challenge verification have independent lifetimes. The application composes them.", visual: diagram(
     altitude: "L2", viewpoint: "context-ownership", title: "Email and authentication contexts",
@@ -37,7 +35,8 @@
     edges: (
       (from: "app", to: "mail", relation: "call", label: "deliver"),
       (from: "app", to: "auth", relation: "call", label: "issue and verify"),
-      (from: "demo", to: "app", relation: "dependency", label: "is an example of"),
+      (from: "demo", to: "mail", relation: "dependency", label: "composes"),
+      (from: "demo", to: "auth", relation: "dependency", label: "composes"),
       (from: "mail", to: "provider", relation: "call", label: "submit"),
       (from: "auth", to: "store", relation: "call", label: "atomic transition"),
       (from: "auth", to: "app", relation: "dataflow", label: "verified subject"),
@@ -48,7 +47,7 @@
       component(name: "Delivery", mission: "Construct validated messages, submit them through a transport, and inspect captured mail in tests.", tint: "blue", answers: answers-data(
         responsibility: [Message values, MIME, SMTP, provider adapters, capture, and the development mailbox. See #ctx("delivery").],
         interface: [Public Gleam modules and optional Postmark and mailbox packages.],
-        failure: [Construction refusal, no-send, rejection, acceptance, and unknown outcome stay distinct.],
+        failure: [Accepted, not sent, rejected, and unknown outcomes stay distinct.],
       )),
       component(name: "Passwordless", mission: "Issue and verify challenges with one atomic consumption over an injected store.", tint: "violet", answers: answers-data(
         responsibility: [Challenge generation, verification, revocation, recovery, and the memory and PostgreSQL stores. See #ctx("passwordless").],

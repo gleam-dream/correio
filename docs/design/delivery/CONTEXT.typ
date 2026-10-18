@@ -10,16 +10,11 @@
     body: [The sender and complete recipient set submitted to the transport, including blind recipients that are absent from rendered headers.],
   ),
   (
-    slug: "term-delivery-evidence",
-    title: [Delivery evidence],
-    body: [The observed distinction between provider acceptance, definite refusal or non-transmission, and possible transmission without a confirmed outcome. It does not establish inbox delivery.],
-  ),
-  (
     slug: "term-delivery-outcome",
     title: [Delivery outcome],
-    body: [The closed result of one submission: accepted, not sent, rejected, or unknown. Each variant states what the library knows about transmission.
+    body: [The closed result of one submission: accepted, not sent, rejected, or unknown. Each variant states what the library observed about transmission, and none establishes inbox delivery.
 
-      _Avoid_: delivery status — implies inbox arrival, which no outcome establishes.],
+      _Avoid_: delivery status — implies inbox arrival, which no outcome establishes; delivery evidence — a second name for the same value.],
   ),
   (
     slug: "term-sender",
