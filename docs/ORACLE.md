@@ -13,12 +13,12 @@ The pins live in [`oracles/manifest.json`](../oracles/manifest.json) and the Mix
 | AshAuthentication | 4.15.0  | [team-alembic/ash_authentication](https://github.com/team-alembic/ash_authentication) | `d6b2be35cf8f0b8ab84e7a934cfb0d91de0a3c17` | MIT     | Magic-link token request and sign-in actions under concurrent redemption       |
 
 - Swoosh and AshAuthentication are exact Git checkouts. `check_sources.py` fails when a checkout differs from its pinned revision or contains any modification.
-- Phoenix templates are byte-for-byte copies under `oracles/vendor/phoenix`. Their SHA-256 hashes are checked against the manifest:
-  - `context_functions.ex.eex`: `0a818348e1cb25666dcd6859e99a865f2e4b214008e71ddfac248933f223c5cc`
-  - `schema.ex.eex`: `f3a79eee63c2b3ff6e373135129238f3f3dfceeb20b4029b28288f90ebd3b592`
-  - `schema_token.ex.eex`: `218427ef8bdd761afdd8d08995aaa1911d427281f3fce72da873fdf05fcf99ec`
+- Phoenix templates are fetched from the pinned revision into the git-ignored `oracles/.cache/phoenix` and never committed. `check_sources.py` downloads each file, compares its SHA-256 with the manifest, and fails with the expected and actual hash on any difference. A cached file with the right hash is reused without network access. The pinned files and hashes are:
+  - `priv/templates/phx.gen.auth/context_functions.ex.eex`: `0a818348e1cb25666dcd6859e99a865f2e4b214008e71ddfac248933f223c5cc`
+  - `priv/templates/phx.gen.auth/schema.ex.eex`: `f3a79eee63c2b3ff6e373135129238f3f3dfceeb20b4029b28288f90ebd3b592`
+  - `priv/templates/phx.gen.auth/schema_token.ex.eex`: `218427ef8bdd761afdd8d08995aaa1911d427281f3fce72da873fdf05fcf99ec`
 - Python's standard MIME parser independently normalizes both the upstream and the Correio message. The pinned SMTP library is shared by Swoosh and the loopback peer, not by Correio's renderer.
-- Upstream licenses are preserved under `oracles/licenses`. These Elixir dependencies are absent from Correio's runtime dependency graph.
+- The repository commits no upstream source, so it carries no upstream license text; each fetched checkout brings its own license. These Elixir dependencies are absent from Correio's runtime dependency graph.
 
 ## What is compared
 
@@ -63,7 +63,7 @@ nix develop -c scripts/oracles
 - The command creates a disposable PostgreSQL cluster, verifies the pins, runs the comparison's own unit tests, executes the upstream implementations, executes Correio, and compares the normalized results.
 - `CORREIO_ORACLE_RESULTS` selects the output directory. The default is `oracles/results`, which is git-ignored.
 - The output directory receives `receipt.json`, the upstream and Correio raw results, and their normalized forms. Files named `ecarta*.json` are the Correio side under its earlier package name. Raw authentication answers are never serialized.
-- The run needs network access only to fetch the pinned Git revisions and Hex packages.
+- The run needs network access only to fetch the pinned Git revisions, the pinned Phoenix template files, and Hex packages.
 
 ## Retained receipt
 

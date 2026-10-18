@@ -18,7 +18,6 @@
 | Gate scripts and workflows (`scripts/`, `.github/`)                                                                                                    | captured       | [Continuous integration](design/evidence/design.typ#continuous-integration)                         |
 | Design layer (`docs/design`, `docs/adr`, `docs/CONTEXT-MAP.md`)                                                                                        | standard       | Conventional design-layer infrastructure                                                            |
 | Nix, direnv, hooks, formatter, package manifests, license                                                                                              | standard       | Conventional development infrastructure                                                             |
-| Vendored upstream oracle sources and their licenses (`oracles/vendor`, `oracles/licenses`)                                                             | out-of-scope   | Upstream files retained byte-for-byte for the pinned oracle                                         |
 
 - Captured identifies intended ownership. It does not claim that implementation or validation has completed.
 - Unbuilt, undecided, or unchecked items appear in the pending ledgers of the [root](design/design.typ), [delivery](design/delivery/design.typ), [passwordless](design/passwordless/design.typ), and [browser demo](design/demo/design.typ) design documents.

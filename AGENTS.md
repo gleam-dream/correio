@@ -8,7 +8,7 @@
 - Exercise public APIs from the separate `apps/passwordless_demo` package with ordinary use, advanced configuration, application-native types, and recovery. Each usage topic is a runnable example there.
 - Never automatically retry a possibly transmitted email.
 - Never read or copy credential files. Use local scripted peers and a disposable PostgreSQL for tests.
-- Pin oracle source revisions and preserve upstream licenses.
+- Pin oracle source revisions. Oracle inputs are fetched into the git-ignored `oracles/.cache` and `oracles/deps` at run time and are never committed.
 
 ## References
 

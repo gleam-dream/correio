@@ -127,4 +127,4 @@ nix develop -c scripts/benchmark
 - Tests use local scripted peers and a disposable PostgreSQL. They need no provider credentials or existing database.
 - [Oracle comparisons](docs/ORACLE.md) record their pinned upstream sources and limits, and [benchmarks](docs/BENCHMARKS.md) record their method and dated results. Each links to the other.
 - The [design](docs/design/design.typ) defines each context's contracts and limits. Its [context map](docs/CONTEXT-MAP.md), [coverage map](docs/COVERAGE.md), and [decision records](docs/adr) hold vocabulary, ownership, and rationale.
-- Code is licensed under [Apache 2.0](LICENSE). Retained upstream oracle files preserve their MIT licenses under `oracles/licenses`.
+- Code is licensed under [Apache 2.0](LICENSE). Oracle inputs are fetched from their upstream projects at run time and are not committed.

@@ -18,5 +18,5 @@
 
 ## Evidence
 
-- The research behind the comparisons inspected Swoosh 1.28.1, Phoenix 1.8.15, and AshAuthentication 4.15.0. The executable manifest retains exact revisions and licenses.
+- The research behind the comparisons inspected Swoosh 1.28.1, Phoenix 1.8.15, and AshAuthentication 4.15.0. The executable manifest retains exact revisions and the hashes of fetched template files.
 - The pinned Ash dependency (3.33.4) has published advisories affecting bulk private action arguments and unsafe atom filtering. The isolated oracle uses neither path, and the dependency is absent from Correio's runtime graph.

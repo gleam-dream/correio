@@ -10,6 +10,7 @@ def source_digest(root: Path, artifacts: tuple[Path, ...] = ()) -> dict:
         "build",
         "_build",
         "deps",
+        ".cache",
         ".render",
         "results",
         ".direnv",
