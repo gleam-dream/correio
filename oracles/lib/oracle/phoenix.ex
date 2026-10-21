@@ -1,5 +1,5 @@
 defmodule Oracle.Phoenix do
-  @moduledoc "Executes unmodified Phoenix authentication templates, fetched and hash-checked by check_sources.py, against PostgreSQL."
+  @moduledoc "Executes unmodified Phoenix authentication templates, lazily fetched and hash-checked by Nix, against PostgreSQL."
 
   def load_templates do
     schema = %{
@@ -44,7 +44,7 @@ defmodule Oracle.Phoenix do
   end
 
   defp template(file, bindings) do
-    EEx.eval_file(Path.join(".cache/phoenix", file), bindings)
+    EEx.eval_file(Path.join(System.fetch_env!("CORREIO_PHOENIX_TEMPLATES"), file), bindings)
   end
 
   defp run_case(name) do

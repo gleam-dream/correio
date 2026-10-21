@@ -22,33 +22,6 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
-        # The upstream apps pin the renderer; authored imports also need its
-        # generated local projection on a fresh checkout.
-        designApp =
-          name:
-          let
-            wrapper = pkgs.writeShellApplication {
-              name = "design-gate-${name}";
-              runtimeInputs = [ pkgs.coreutils ];
-              text = ''
-                project_layer() {
-                  if [ -f "$1/design.typ" ]; then
-                    mkdir -p "$1/.render"
-                    cp -RL --remove-destination --no-preserve=mode ${
-                      design-layer.packages.${system}.gate-bundle
-                    }/render/. "$1/.render/"
-                  fi
-                }
-                project_layer "''${1:-docs/design}"
-                exec ${design-layer.apps.${system}.${name}.program} "$@"
-              '';
-            };
-          in
-          {
-            type = "app";
-            program = "${wrapper}/bin/design-gate-${name}";
-          };
-
         # One derivation shared by the devShell and the mix-format formatter,
         # so `nix fmt` never formats with a different Elixir/OTP than the
         # shell actually runs prototypes on.
@@ -75,10 +48,33 @@
         };
       in
       {
+        # Keep oracle inputs out of the shell closure; only comparisons use them.
+        apps.oracle-phoenix-templates = {
+          type = "app";
+          program =
+            let
+              source = (builtins.fromJSON (builtins.readFile ./oracles/manifest.json)).phoenix;
+              templates = pkgs.linkFarm "phoenix-oracle-templates" (
+                pkgs.lib.mapAttrsToList (path: sha256: {
+                  name = builtins.baseNameOf path;
+                  path = pkgs.fetchurl {
+                    url = "${
+                      builtins.replaceStrings [ "https://github.com/" ] [ "https://raw.githubusercontent.com/" ]
+                        source.source
+                    }/${source.revision}/${path}";
+                    inherit sha256;
+                  };
+                }) source.files
+              );
+            in
+            "${pkgs.writeShellScript "oracle-phoenix-templates" ''
+              printf '%s\n' ${templates}
+            ''}";
+        };
         apps.snips = design-layer.apps.${system}.snips;
-        apps.design-gate-check = designApp "check";
-        apps.design-gate-render = designApp "render";
-        apps.design-gate-context = designApp "context";
+        apps.design-gate-check = design-layer.apps.${system}.check;
+        apps.design-gate-render = design-layer.apps.${system}.render;
+        apps.design-gate-context = design-layer.apps.${system}.context;
 
         devShells.default = pkgs.mkShell {
           # Gleam and OTP run Correio; Elixir runs the pinned email and

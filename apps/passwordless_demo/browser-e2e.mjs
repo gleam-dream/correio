@@ -1,32 +1,12 @@
-// Real Chromium navigation and cookies; no npm dependencies or external websites.
+// Real Chromium navigation and cookies against local peers.
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chromium } from "playwright-core";
 import http from "node:http";
-import os from "node:os";
-import path from "node:path";
 import readline from "node:readline";
 
 const origin = process.argv[2];
 assert.match(origin, /^http:\/\/127\.0\.0\.1:\d+$/);
-const profile = await mkdtemp(path.join(os.tmpdir(), "correio-browser-"));
-const chrome = spawn(
-  process.env.CORREIO_BROWSER_CHROMIUM || "chromium",
-  [
-    "--headless=new",
-    "--no-sandbox",
-    "--disable-dev-shm-usage",
-    "--disable-gpu",
-    "--no-first-run",
-    "--disable-background-networking",
-    "--disable-component-update",
-    "--remote-debugging-port=0",
-    `--user-data-dir=${profile}`,
-    "about:blank",
-  ],
-  { stdio: ["ignore", "ignore", "pipe"] },
-);
-let socket;
+let browser;
 let webmail;
 const stdin = readline.createInterface({
   input: process.stdin,
@@ -42,128 +22,26 @@ const readLine = () =>
     ? Promise.resolve(incoming.shift())
     : new Promise((resolve) => waiting.push(resolve));
 try {
-  const endpoint = await new Promise((resolve, reject) => {
-    const timeout = setTimeout(
-      () => reject(new Error("Chromium startup deadline")),
-      30000,
-    );
-    chrome.on("error", reject);
-    chrome.on("exit", () =>
-      reject(new Error("Chromium exited during startup")),
-    );
-    let text = "";
-    chrome.stderr.on("data", (chunk) => {
-      text = (text + chunk).slice(-20000);
-      const match = text.match(/DevTools listening on (ws:\/\/[^\s]+)/);
-      if (match) {
-        clearTimeout(timeout);
-        resolve(match[1]);
-      }
-    });
+  browser = await chromium.launch({
+    executablePath: process.env.CORREIO_BROWSER_CHROMIUM || "chromium",
+    headless: true,
   });
-  socket = new WebSocket(endpoint);
-  await new Promise((resolve, reject) => {
-    socket.onopen = resolve;
-    socket.onerror = reject;
+  const context = await browser.newContext({
+    viewport: { width: 1100, height: 1800 },
   });
-  let next = 0;
-  const pending = new Map();
   const requests = [];
-  const frameSessions = new Map();
-  const attachmentErrors = [];
-  socket.onmessage = ({ data }) => {
-    const message = JSON.parse(data);
-    if (message.method === "Target.attachedToTarget") {
-      const child = message.params;
-      frameSessions.set(child.targetInfo.targetId, child.sessionId);
-      // The child waits for debugger release, so observation starts before
-      // its document can request resources or navigate.
-      (async () => {
-        await send("Network.enable", {}, child.sessionId);
-        await send("Runtime.enable", {}, child.sessionId);
-        await send("Runtime.runIfWaitingForDebugger", {}, child.sessionId);
-      })().catch((error) => attachmentErrors.push(error.message));
-    }
-
-    if (message.method === "Network.requestWillBeSent")
-      requests.push(message.params.request.url);
-    if (pending.has(message.id)) {
-      const { resolve, reject, timeout } = pending.get(message.id);
-      pending.delete(message.id);
-      clearTimeout(timeout);
-      message.error
-        ? reject(new Error("Browser protocol command failed"))
-        : resolve(message.result);
-    }
-  };
-  const send = (method, params = {}, sessionId) =>
-    new Promise((resolve, reject) => {
-      const id = ++next;
-      const timeout = setTimeout(() => {
-        pending.delete(id);
-        reject(new Error(`Browser deadline: ${method}`));
-      }, 10000);
-      pending.set(id, { resolve, reject, timeout });
-      socket.send(
-        JSON.stringify({
-          id,
-          method,
-          params,
-          ...(sessionId ? { sessionId } : {}),
-        }),
-      );
-    });
-  const { targetId } = await send("Target.createTarget", {
-    url: "about:blank",
-  });
-  const { sessionId } = await send("Target.attachToTarget", {
-    targetId,
-    flatten: true,
-  });
-  const command = (method, params) => send(method, params, sessionId);
-  await command("Page.enable");
-  await command("Emulation.setDeviceMetricsOverride", {
-    width: 1100,
-    height: 1800,
-    deviceScaleFactor: 1,
-    mobile: false,
-  });
-  await command("Runtime.enable");
-  await command("Network.enable");
-  await command("Target.setAutoAttach", {
-    autoAttach: true,
-    waitForDebuggerOnStart: true,
-    flatten: true,
-  });
-  const evaluate = async (expression) => {
-    const reply = await command("Runtime.evaluate", {
-      expression,
-      returnByValue: true,
-      awaitPromise: true,
-      userGesture: true,
-    });
-    if (reply.exceptionDetails)
-      throw new Error("Browser page evaluation failed");
-    return reply.result.value;
-  };
+  // Register before any navigation, including sandboxed out-of-process frames.
+  context.on("request", (request) => requests.push(request.url()));
+  const page = await context.newPage();
+  const evaluate = (expression) => page.evaluate(expression);
   const until = async (expression, label) => {
-    for (let attempt = 0; attempt < 200; attempt++) {
-      try {
-        if (await evaluate(expression)) return;
-      } catch {
-        /* navigation replaces the execution context */
-      }
-      await new Promise((resolve) => setTimeout(resolve, 25));
+    try {
+      await page.waitForFunction(expression, undefined, { timeout: 10000 });
+    } catch {
+      throw new Error(`Browser condition failed: ${label}`);
     }
-    const route = await evaluate("location.pathname");
-    const bodyKind = await evaluate(
-      "['Request refused', 'Bad request', 'Internal error', 'Email sign-in link'].find(value => document.body.innerText.includes(value)) || 'other page'",
-    );
-    throw new Error(
-      `Browser condition failed: ${label}; route=${route}; page=${bodyKind}`,
-    );
   };
-  await command("Page.navigate", { url: origin });
+  await page.goto(origin);
   await until(
     "document.readyState === 'complete' && !!document.querySelector('form')",
     "issue form ready",
@@ -175,23 +53,24 @@ try {
     "document.body.innerText.includes('If this account exists')",
     "neutral issue response",
   );
-  let cookies = (await command("Network.getCookies", { urls: [origin] }))
-    .cookies;
+  let cookies = await context.cookies(origin);
   const binding = cookies.find((cookie) => cookie.name === "browser");
   assert.equal(binding.sameSite, "Lax");
   assert.equal(binding.httpOnly, true);
-  await command("Network.setCookie", {
-    name: "session",
-    value: "attacker-fixed-session",
-    url: origin,
-    httpOnly: true,
-    sameSite: "Strict",
-  });
+  await context.addCookies([
+    {
+      name: "session",
+      value: "attacker-fixed-session",
+      url: origin,
+      httpOnly: true,
+      sameSite: "Strict",
+    },
+  ]);
   console.log("ISSUED");
   const link = await readLine();
   assert.equal(new URL(link).origin, origin);
   const beforeInspection = requests.length;
-  await command("Page.navigate", { url: `${origin}/dev/mailbox` });
+  await page.goto(`${origin}/dev/mailbox`);
   await until(
     "!!document.querySelector('[data-message-id]')",
     "development mailbox inbox",
@@ -216,42 +95,25 @@ try {
     ),
     true,
   );
-  const previewDeadline = Date.now() + 10000;
-  let previewReady = false;
-  while (Date.now() < previewDeadline && !previewReady) {
-    assert.deepEqual(attachmentErrors, []);
-    const targets = await send("Target.getTargets");
-    const preview = targets.targetInfos.find(
-      (target) => target.type === "iframe" && target.parentId === targetId,
-    );
-    const previewSession = preview && frameSessions.get(preview.targetId);
-    if (previewSession) {
-      assert.ok(
-        preview.url === "about:srcdoc",
-        "Preview unexpectedly navigated",
-      );
-      const content = await send(
-        "Runtime.evaluate",
-        {
-          expression:
-            "({ready: document.readyState, heading: document.querySelector('h2')?.innerText, active: document.querySelectorAll('script,form,img,iframe,a,[src],[href],[onfocus],meta[http-equiv=refresh]').length})",
-          returnByValue: true,
-        },
-        previewSession,
-      );
-      const value = content.result.value;
-      previewReady =
-        value?.ready === "complete" && value?.heading === "Sign in safely";
-      if (previewReady) assert.equal(value.active, 0);
-    }
-    if (!previewReady) await new Promise((resolve) => setTimeout(resolve, 25));
-  }
-  assert.ok(
-    previewReady,
-    "Sandboxed formatting preview loaded before deadline",
+  const preview = page.frameLocator("iframe");
+  await preview.locator("h2").waitFor({ state: "visible", timeout: 10000 });
+  assert.equal(await preview.locator("h2").innerText(), "Sign in safely");
+  assert.equal(
+    await preview
+      .locator(
+        "script,form,img,iframe,a,[src],[href],[onfocus],meta[http-equiv=refresh]",
+      )
+      .count(),
+    0,
+  );
+  const child = page.frames().find((frame) => frame.parentFrame());
+  assert.equal(
+    await child.evaluate(() => location.href),
+    "about:srcdoc",
+    "Preview unexpectedly navigated",
   );
   // Observe the fully loaded frame long enough for zero-delay refresh or script
-  // regressions; both parent and child sessions have network observation.
+  // regressions; the browser context observes requests from every frame.
   await new Promise((resolve) => setTimeout(resolve, 300));
   assert.equal(
     requests
@@ -260,14 +122,7 @@ try {
     false,
   );
   assert.equal(await evaluate("window.mailboxPwned === undefined"), true);
-  const screenshot = await command("Page.captureScreenshot", {
-    format: "png",
-    captureBeyondViewport: true,
-  });
-  await writeFile(
-    "/tmp/correio-mailbox.png",
-    Buffer.from(screenshot.data, "base64"),
-  );
+  await page.screenshot({ path: "/tmp/correio-mailbox.png", fullPage: true });
 
   webmail = http.createServer((_request, response) => {
     response.setHeader("Content-Type", "text/html");
@@ -277,7 +132,7 @@ try {
   });
   await new Promise((resolve) => webmail.listen(0, "127.0.0.1", resolve));
   const mailOrigin = `http://localhost:${webmail.address().port}`;
-  await command("Page.navigate", { url: mailOrigin });
+  await page.goto(mailOrigin);
   await until(
     "location.hostname === 'localhost' && !!document.querySelector('#login')",
     "cross-site webmail",
@@ -288,12 +143,12 @@ try {
     "Lax cookie on email navigation",
   );
   assert.equal(await evaluate("location.search"), "");
-  await command("Page.navigate", { url: `${origin}/session` });
+  await page.goto(`${origin}/session`);
   await until(
     "document.body.innerText === 'No session'",
     "preview has no session",
   );
-  await command("Page.navigate", { url: `${origin}/confirm` });
+  await page.goto(`${origin}/confirm`);
   await until(
     "!!document.querySelector('input[name=csrf]')",
     "confirmation form restored",
@@ -306,12 +161,12 @@ try {
     "document.body.innerText === 'Signed in'",
     "intentional confirmation POST",
   );
-  await command("Page.navigate", { url: `${origin}/session` });
+  await page.goto(`${origin}/session`);
   await until(
     "document.body.innerText === 'Authenticated native account'",
     "session cookie authenticates",
   );
-  cookies = (await command("Network.getCookies", { urls: [origin] })).cookies;
+  cookies = await context.cookies(origin);
   const session = cookies.find((cookie) => cookie.name === "session");
   assert.equal(session.httpOnly, true);
   assert.equal(session.sameSite, "Strict");
@@ -330,32 +185,18 @@ try {
     }),
   );
 } catch (error) {
-  // Never print page URLs, captured links, cookies, or raw browser messages.
-  console.error(error instanceof Error ? error.message : "Browser test failed");
+  // Browser errors can contain sign-in URLs or cookies. Report only source location.
+  const source = error.stack?.match(/browser-e2e\.mjs:(\d+):(\d+)/);
+  console.error(
+    `Browser integration test failed${source ? ` at ${source[1]}:${source[2]}` : ""}`,
+  );
   process.exitCode = 1;
 } finally {
   stdin.close();
   process.stdin.destroy();
-  if (socket) socket.close();
   if (webmail) {
     webmail.closeAllConnections();
     await new Promise((resolve) => webmail.close(resolve));
   }
-  chrome.kill("SIGTERM");
-  await new Promise((resolve) => {
-    if (chrome.exitCode !== null) resolve();
-    else {
-      chrome.once("exit", resolve);
-      setTimeout(() => {
-        chrome.kill("SIGKILL");
-        resolve();
-      }, 3000).unref();
-    }
-  });
-  await rm(profile, {
-    recursive: true,
-    force: true,
-    maxRetries: 3,
-    retryDelay: 100,
-  });
+  await browser?.close();
 }

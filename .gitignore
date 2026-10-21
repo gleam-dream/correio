@@ -5,3 +5,4 @@ erl_crash.dump
 **/.render/
 .ruff_cache/
 __pycache__/
+node_modules/

@@ -4,7 +4,7 @@ Correio is compared against pinned upstream implementations that run unmodified.
 
 ## Reference sources
 
-The pins live in [`oracles/manifest.json`](../oracles/manifest.json) and the Mix lock, which retains every transitive dependency version. `oracles/check_sources.py` verifies each pin before a run.
+The pins live in [`oracles/manifest.json`](../oracles/manifest.json) and the Mix lock, which retains every transitive dependency version. `oracles/check_sources.py` verifies dependency revisions before a run; Nix verifies the template hashes.
 
 | Reference         | Version | Upstream                                                                              | Pinned revision                            | License | Executed behavior                                                              |
 | ----------------- | ------- | ------------------------------------------------------------------------------------- | ------------------------------------------ | ------- | ------------------------------------------------------------------------------ |
@@ -12,8 +12,8 @@ The pins live in [`oracles/manifest.json`](../oracles/manifest.json) and the Mix
 | Phoenix           | 1.8.15  | [phoenixframework/phoenix](https://github.com/phoenixframework/phoenix)               | `bd1801833b4fd7ceb02497cc7ba2d05e9bd391c8` | MIT     | Upstream `phx.gen.auth` templates rendered and executed on PostgreSQL          |
 | AshAuthentication | 4.15.0  | [team-alembic/ash_authentication](https://github.com/team-alembic/ash_authentication) | `d6b2be35cf8f0b8ab84e7a934cfb0d91de0a3c17` | MIT     | Magic-link token request and sign-in actions under concurrent redemption       |
 
-- Swoosh and AshAuthentication are exact Git checkouts. `check_sources.py` fails when a checkout differs from its pinned revision or contains any modification.
-- Phoenix templates are fetched from the pinned revision into the git-ignored `oracles/.cache/phoenix` and never committed. `check_sources.py` downloads each file, compares its SHA-256 with the manifest, and fails with the expected and actual hash on any difference. A cached file with the right hash is reused without network access. The pinned files and hashes are:
+- Swoosh and AshAuthentication are exact Git checkouts. `check_sources.py` fails when a checkout differs from its pinned revision.
+- Phoenix templates are fetched from the pinned revision by `nix run .#oracle-phoenix-templates` only when the comparison runs. Nix checks each SHA-256 from the manifest, rejects mismatches, and caches the templates in its store. The comparison passes that directory through `CORREIO_PHOENIX_TEMPLATES`. Entering the shell, formatting and ordinary compilation or tests do not fetch the templates. The pinned files and hashes are:
   - `priv/templates/phx.gen.auth/context_functions.ex.eex`: `0a818348e1cb25666dcd6859e99a865f2e4b214008e71ddfac248933f223c5cc`
   - `priv/templates/phx.gen.auth/schema.ex.eex`: `f3a79eee63c2b3ff6e373135129238f3f3dfceeb20b4029b28288f90ebd3b592`
   - `priv/templates/phx.gen.auth/schema_token.ex.eex`: `218427ef8bdd761afdd8d08995aaa1911d427281f3fce72da873fdf05fcf99ec`

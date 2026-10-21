@@ -2,8 +2,9 @@
 # Real Chromium cookie and cross-site email-link navigation against local peers.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-command -v chromium >/dev/null
+command -v "${CORREIO_BROWSER_CHROMIUM:-chromium}" >/dev/null
 command -v node >/dev/null
-chromium --version
+"${CORREIO_BROWSER_CHROMIUM:-chromium}" --version
 node --version
+(cd apps/passwordless_demo && npm ci --no-fund --no-audit)
 scripts/with-postgres.sh sh -c 'cd apps/passwordless_demo && gleam run -m browser_e2e'

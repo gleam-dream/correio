@@ -7,6 +7,8 @@ CORREIO_ORACLE_RESULTS="$(realpath "$CORREIO_ORACLE_RESULTS")"
 export CORREIO_ORACLE_RESULTS
 mix deps.get --check-locked
 python3 check_sources.py
+CORREIO_PHOENIX_TEMPLATES="$(nix run --no-update-lock-file ..#oracle-phoenix-templates)"
+export CORREIO_PHOENIX_TEMPLATES
 python3 -m unittest test_comparison.py
 mix run run.exs
 cd correio_fixture
