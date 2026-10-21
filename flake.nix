@@ -65,6 +65,11 @@
             enable = true;
             package = elixirPackage;
           };
+          programs.ruff-format.enable = true;
+          settings.formatter.ruff-format.includes = [
+            "oracles/*.py"
+            "benchmarks/*.py"
+          ];
           programs.nixfmt.enable = true;
           programs.prettier.enable = true;
         };
@@ -86,8 +91,6 @@
               beam29Packages.erlang
               beam29Packages.rebar3
               elixirPackage
-              actionlint
-              shellcheck
               ripgrep
               ruff
               # Disposable clusters for atomic challenge storage and fault tests.

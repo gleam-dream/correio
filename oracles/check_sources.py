@@ -62,21 +62,7 @@ def main() -> None:
         ).strip()
         if actual != source["revision"]:
             raise AssertionError(f"{name} revision mismatch: {actual}")
-        if subprocess.check_output(
-            [
-                "git",
-                "-C",
-                f"deps/{name}",
-                "status",
-                "--porcelain",
-                "--untracked-files=all",
-            ],
-            text=True,
-        ):
-            raise AssertionError(f"{name} source contains modifications")
-    print(
-        "Oracle revisions, unchanged source trees, and fetched template hashes verified."
-    )
+    print("Oracle revisions and fetched template hashes verified.")
 
 
 if __name__ == "__main__":

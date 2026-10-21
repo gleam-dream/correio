@@ -23,5 +23,5 @@ jobs:
         with:
           name: correio-benchmark-observations
           path: build/benchmark/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30

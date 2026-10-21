@@ -19,15 +19,14 @@
 ## Tooling
 
 - `nix develop` supplies Gleam, Erlang/OTP 29, rebar3, Elixir, Python, PostgreSQL, Node, and lefthook. Linux shells also supply Chromium for browser checks.
-- `nix develop -c scripts/check` runs the fast gate: format, build, and test for the package, both adapters, and the consumer (including every usage example), then the shell and Python checks and `scripts/e2e`.
+- `nix develop -c scripts/check` runs application compilation and tests for the package, both adapters, and the consumer (including every usage example), then comparison tests and `scripts/e2e`.
 - `nix develop -c scripts/e2e` runs the native SMTP, HTTP-provider, PostgreSQL fault, and browser-consumer suites. `scripts/browser-e2e` runs the Chromium check alone.
 - `nix develop -c scripts/oracles` runs the pinned oracle comparisons (see `docs/ORACLE.md`). `nix develop -c scripts/benchmark` runs the benchmarks, which impose no threshold and never gate a change (see `docs/BENCHMARKS.md`).
 - `scripts/with-postgres.sh CMD...` runs a command against a disposable PostgreSQL.
 - Adapter tests: `nix develop -c scripts/with-postgres.sh sh -c 'cd adapters/correio_postgres && gleam test && ./check-ownership.sh'`; in `adapters/correio_postmark` and `adapters/correio_mailbox`, run `nix develop ../.. -c gleam test`.
 - Try the local login flow with `nix develop -c sh -c 'cd apps/passwordless_demo && gleam run -m dev'`.
 - `nix fmt -- PATH...` formats named files, `nix flake check` checks formatting, and the pre-commit hook formats and re-stages staged files.
-- `nix run .#design-gate-render -- docs/design docs/design/design-layer.pdf` renders the design, and `nix run .#design-gate-check -- docs/design .` checks render freshness and design integrity.
-- After authoring the design, run context estimation and a selected section export. Run layer operations sequentially because they share `.render`.
+- `nix run .#design-gate-render -- docs/design docs/design/design-layer.pdf` renders the design.
 - Unpublished sibling packages (HTTP Gun and Warden, with what they pull in) are Git dependencies on `main`; each `manifest.toml` is the lock. Update one by hand with `gleam update <package>` when its public contract changes. CI never restores a shared compiled dependency cache.
 - Use repository-scoped Git only. Preserve sibling repositories and unrelated work.
 
@@ -58,22 +57,10 @@ verbatim): states `needs-triage`, `needs-info`, `ready-for-agent`,
 **AI disclaimer** — AI-authored tracker comments start with
 `AI-assisted contribution.`
 
-**Design gate** — `nix run .#design-gate-check -- docs/design .` checks render freshness,
-vocabulary references and layer integrity (exit 0 clean, 1 violation, 2 error).
-The gate is supplied by the pinned `design-layer` flake input.
-`nix run .#design-gate-render -- docs/design docs/design/design-layer.pdf`
-rebuilds the rendered document. `nix run .#design-gate-context -- docs/design --estimate`
-estimates agent context; the same command without `--estimate` emits ephemeral
-Markdown. `--manifest`, `--preview`, and `--section PATH --expect-digest DIGEST`
-support loading selected sections. A bare Typst compilation does not run the gate.
-
-**Context verification** — use native semantic blocks for lists, tables,
-models and behavior. After authoring, verify context estimation and a selected
-section export as well as rendering and the design gate.
-Run these commands sequentially for each layer; they share its generated
-`.render` workspace.
-
-**Staleness** — source changes since the design last changed require a
-conformance review before the layer is treated as current.
+**Design tools** — `nix run .#design-gate-render -- docs/design docs/design/design-layer.pdf`
+renders the design. `nix run .#design-gate-context -- docs/design --estimate`
+estimates context. CI calls the shared validator directly with
+`nix run .#design-gate-check -- docs/design .`. Run `nix flake check` separately
+for repository formatting. Local test scripts own application compilation and behavior.
 
 <!-- agent-skills:end -->
