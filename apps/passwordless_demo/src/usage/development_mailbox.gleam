@@ -12,9 +12,11 @@ import gleam/http/request
 import gleam/string
 
 pub fn run() -> Nil {
+  // snips-start: mailbox-setup
   let assert Ok(outbox) = capture.start(100)
   let send = capture.sender(outbox)
   let assert Ok(mailbox) = correio_mailbox.new(outbox, at: "/dev/mailbox")
+  // snips-end: mailbox-setup
 
   // Mount paths are slash-separated ASCII segments with no empty segments.
   assert correio_mailbox.new(outbox, at: "/")
@@ -57,6 +59,8 @@ pub fn run() -> Nil {
   Nil
 }
 
+// snips-start: mailbox-handler
 fn get(mailbox: correio_mailbox.Mailbox, path: String) {
   correio_mailbox.handle(mailbox, request.new() |> request.set_path(path))
 }
+// snips-end: mailbox-handler

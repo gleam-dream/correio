@@ -5,27 +5,35 @@
 - Messages work with SMTP, Postmark, or an explicitly owned capture adapter. Passwordless verification works independently with memory or PostgreSQL storage.
 - Version `0.1.0` is pre-release and not yet published to Hex.
 
-## Construct and send email
+## Construct email
 
+<!-- prettier-ignore-start -->
+
+<!-- snips: apps/passwordless_demo/src/usage/compose_message.gleam#compose-message -->
 ```gleam
-import correio/address
-import correio/delivery
-import correio/message
-import correio/smtp
+// Parse addresses with ordinary `Result` handling. A display name is optional.
+let assert Ok(from) =
+  address.parse("hello@example.com")
+  |> result.try(address.named(_, "Correio Store"))
+let assert Ok(to) = address.parse("reader@example.com")
+let assert Ok(copy) = address.parse("copy@example.com")
+let assert Ok(audit) = address.parse("audit@example.com")
+let assert Ok(support) = address.parse("support@example.com")
+let assert Ok(bounce) = address.parse("bounces@example.com")
 
-pub fn send_welcome() -> delivery.Outcome {
-  let assert Ok(from) = address.parse("hello@example.com")
-  let assert Ok(to) = address.parse("reader@example.com")
-  let assert Ok(mail) = message.new(
+let assert Ok(mail) =
+  message.new(
     from,
     to,
-    "Welcome",
-    message.Alternative("Welcome aboard.", "<p>Welcome aboard.</p>"),
+    "Your order",
+    message.Alternative(
+      "Your order is ready.",
+      "<p>Your order is ready.</p><img src=\"cid:logo\">",
+    ),
   )
-  let assert Ok(transport) = smtp.starttls("smtp.example.com", 587)
-  smtp.send(transport, mail)
-}
 ```
+
+<!-- prettier-ignore-end -->
 
 - The assertions above validate fixed configuration. Parse user input through ordinary `Result` handling.
 - Add recipients, reply-to, custom headers, attachments, and an explicit envelope sender through `correio/message`.
@@ -35,21 +43,43 @@ pub fn send_welcome() -> delivery.Outcome {
 
 ## Test an application email flow
 
-```gleam
-import correio/capture
-import correio/testing
+Here `welcome` is application code that accepts an injected sender and builds its message.
 
+<!-- prettier-ignore-start -->
+
+<!-- snips: apps/passwordless_demo/src/usage/capture_flow.gleam#capture-flow -->
+```gleam
+let assert Ok(recipient) = address.parse("reader@example.com")
+let assert Ok(other) = address.parse("someone-else@example.com")
+
+// Give each test its own capture so parallel tests cannot see each other.
 let assert Ok(outbox) = capture.start(100)
+let sender = capture.sender(outbox)
+
+// Mail sent before the checkpoint can never satisfy the helper.
+let assert delivery.Accepted(_) = welcome(sender, other)
 let assert Ok(checkpoint) = capture.checkpoint(outbox)
-// Inject capture.sender(outbox), then trigger your application's flow.
-let assert Ok(mail) = testing.await(
-  checkpoint,
-  matching: testing.to(recipient),
-  timeout_ms: 1000,
-)
-// Inspect message.view(mail).body and drive your application intentionally.
+
+let assert delivery.Accepted(_) = welcome(sender, recipient)
+let assert Ok(mail) =
+  testing.await(checkpoint, matching: testing.to(recipient), timeout_ms: 1000)
+assert message.view(mail).subject == "Welcome"
+assert message.view(mail).body
+  == message.Text("Open https://app.example.test/start to begin.")
+
+// Awaiting mail that never arrives is a bounded, typed failure.
+assert testing.await(checkpoint, matching: testing.to(other), timeout_ms: 50)
+  == Error(testing.TimedOut)
+assert testing.await(checkpoint, matching: testing.to(other), timeout_ms: -1)
+  == Error(testing.InvalidTimeout)
+
+// Inspection never consumes: since() returns the post-checkpoint messages.
+let assert Ok(after) = capture.since(checkpoint)
+assert after != []
 let assert Ok(Nil) = capture.stop(outbox)
 ```
+
+<!-- prettier-ignore-end -->
 
 - Record the checkpoint before triggering the flow. Earlier messages cannot satisfy the helper.
 - Give each parallel test its own capture, or match an application correlation field in a custom predicate.
@@ -62,25 +92,19 @@ nix develop -c sh -c 'cd apps/passwordless_demo && gleam run -m dev'
 
 ## Verify a native application subject
 
+The runnable example defines `AccountId(Int)` and a demonstration key; supply your own stable secret in an application.
+
+<!-- prettier-ignore-start -->
+
+<!-- snips: apps/passwordless_demo/src/usage/passwordless_memory.gleam#passwordless-service -->
 ```gleam
-import correio/passwordless
-import correio/passwordless/memory
-
-pub type AccountId {
-  AccountId(Int)
-}
-
-pub fn service(key: BitArray) {
-  let assert Ok(runtime) = memory.start(1000)
-  let assert Ok(auth) = passwordless.new(
-    memory.store(runtime),
-    "example-app",
-    "login",
-    key,
-  )
-  #(runtime, auth)
-}
+let assert Ok(runtime) = memory.start(1000)
+let assert Ok(auth) =
+  passwordless.new(memory.store(runtime), "example-app", "login", demo_key)
+let assert Ok(auth) = passwordless.with_policy(auth, 60_000, 3, 3_600_000)
 ```
+
+<!-- prettier-ignore-end -->
 
 - Supply a stable application secret of 32–4096 cryptographically random bytes. Never use a literal demonstration key in a deployed application.
 - `passwordless.issue(auth, AccountId(42), destination, MagicLink)` returns an opaque challenge, and `EmailCode(8)` selects an eight-digit code. Issuing a challenge does not send email.
@@ -91,7 +115,7 @@ pub fn service(key: BitArray) {
 
 ## Runnable examples
 
-Every topic below is code that compiles and runs in the repository gate, so it stays current with the library. The snippets above mirror the first three.
+Every topic below is code that compiles and runs in the repository gate, so it stays current with the library. The snippets above are excerpts of the message, capture and passwordless examples.
 
 | Topic                                  | Example                                                                                 |
 | -------------------------------------- | --------------------------------------------------------------------------------------- |

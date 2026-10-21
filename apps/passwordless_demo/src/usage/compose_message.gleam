@@ -8,6 +8,7 @@ import gleam/option.{Some}
 import gleam/result
 
 pub fn run() -> Nil {
+  // snips-start: compose-message
   // Parse addresses with ordinary `Result` handling. A display name is optional.
   let assert Ok(from) =
     address.parse("hello@example.com")
@@ -28,6 +29,7 @@ pub fn run() -> Nil {
         "<p>Your order is ready.</p><img src=\"cid:logo\">",
       ),
     )
+  // snips-end: compose-message
   let assert Ok(mail) = message.header(mail, "X-Order-Id", "42")
   let assert Ok(logo) =
     message.attachment(

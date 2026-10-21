@@ -24,6 +24,7 @@ pub fn welcome(
 }
 
 pub fn run() -> Nil {
+  // snips-start: capture-flow
   let assert Ok(recipient) = address.parse("reader@example.com")
   let assert Ok(other) = address.parse("someone-else@example.com")
 
@@ -52,5 +53,6 @@ pub fn run() -> Nil {
   let assert Ok(after) = capture.since(checkpoint)
   assert after != []
   let assert Ok(Nil) = capture.stop(outbox)
+  // snips-end: capture-flow
   Nil
 }

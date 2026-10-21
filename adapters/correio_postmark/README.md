@@ -6,20 +6,38 @@ Runnable example: [`test/usage_test.gleam`](test/usage_test.gleam) sends through
 
 ## Use
 
-```gleam
-import correio_postmark as postmark
-import http_gun
-import http_gun/config
-import http_gun/redaction
+This excerpt sends a message to the test's scripted loopback peer at `port`, using a dummy token and its `mail()` fixture. Production uses the application's server token and the default Postmark endpoint.
 
+<!-- prettier-ignore-start -->
+
+<!-- snips: test/usage_test.gleam#postmark-send -->
+```gleam
 let settings =
   config.default()
+  |> config.allow_loopback
   |> config.with_redaction(postmark.redact_token(redaction.default()))
 let assert Ok(client) = http_gun.start(settings)
-let assert Ok(provider) = postmark.new(client, server_token)
-let result = postmark.send(provider, message, postmark.options())
-http_gun.stop(client)
+
+// A server token is validated, and `local_test` selects the local endpoint.
+let assert Ok(provider) =
+  postmark.new(client, "DUMMY_SERVER_TOKEN")
+  |> result.try(postmark.local_test(_, port))
+let assert Ok(provider) = postmark.deadline(provider, 5000)
+let assert Ok(provider) = postmark.response_limit(provider, 65_536)
+
+// Provider options are typed and validated.
+let assert Ok(options) =
+  postmark.options()
+  |> postmark.tag("welcome")
+  |> result.try(postmark.stream(_, "outbound"))
+  |> result.try(postmark.metadata(_, "account", "42"))
+
+// `sender` supplies Correio's common delivery function for injection.
+let send: delivery.Sender = postmark.sender(provider, options)
+let assert delivery.Accepted(receipt) = send(mail())
 ```
+
+<!-- prettier-ignore-end -->
 
 - The application owns the HTTP Gun client and its shutdown. `sender(provider, options)` supplies Correio's common `delivery.Sender` function.
 - Configure `redact_token` before starting a client or recording. The default redaction policy does not hide the Postmark server token, and recordings also retain message bodies and addresses unless `redaction.with_body` is supplied.

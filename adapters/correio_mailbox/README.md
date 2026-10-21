@@ -6,17 +6,29 @@ Runnable example: [`development_mailbox`](../../apps/passwordless_demo/src/usage
 
 ## Mount
 
-```gleam
-import correio/capture
-import correio_mailbox
+<!-- prettier-ignore-start -->
 
+<!-- snips: ../../apps/passwordless_demo/src/usage/development_mailbox.gleam#mailbox-setup -->
+```gleam
 let assert Ok(outbox) = capture.start(100)
 let send = capture.sender(outbox)
 let assert Ok(mailbox) = correio_mailbox.new(outbox, at: "/dev/mailbox")
-// Inject send into your application's delivery dependency.
-// In your development router, pass the original Gleam HTTP request:
-let response = correio_mailbox.handle(mailbox, request)
 ```
+
+<!-- prettier-ignore-end -->
+
+Inject `send` into the application and route requests through the mailbox. The runnable example uses this GET helper:
+
+<!-- prettier-ignore-start -->
+
+<!-- snips: ../../apps/passwordless_demo/src/usage/development_mailbox.gleam#mailbox-handler -->
+```gleam
+fn get(mailbox: correio_mailbox.Mailbox, path: String) {
+  correio_mailbox.handle(mailbox, request.new() |> request.set_path(path))
+}
+```
+
+<!-- prettier-ignore-end -->
 
 - Enable the route only in a development environment. Captured mail exposes secrets and blind recipients, and the application owns access control and the server.
 - No HTTP listener starts in this package.

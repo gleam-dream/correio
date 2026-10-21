@@ -31,10 +31,12 @@ fn losing_first_acknowledgement(
 }
 
 pub fn run() -> Nil {
+  // snips-start: passwordless-service
   let assert Ok(runtime) = memory.start(1000)
   let assert Ok(auth) =
     passwordless.new(memory.store(runtime), "example-app", "login", demo_key)
   let assert Ok(auth) = passwordless.with_policy(auth, 60_000, 3, 3_600_000)
+  // snips-end: passwordless-service
 
   // Issuing does not send email. The application delivers the answer itself.
   let assert Ok(challenge) =

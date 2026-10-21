@@ -40,6 +40,7 @@ pub fn send_through_postmark_test() {
   // The application owns the HTTP client. Add the provider token header to
   // the redaction policy before starting it. This example also admits loopback
   // because the peer is local; a production client talks to Postmark over TLS.
+  // snips-start: postmark-send
   let settings =
     config.default()
     |> config.allow_loopback
@@ -63,6 +64,7 @@ pub fn send_through_postmark_test() {
   // `sender` supplies Correio's common delivery function for injection.
   let send: delivery.Sender = postmark.sender(provider, options)
   let assert delivery.Accepted(receipt) = send(mail())
+  // snips-end: postmark-send
   receipt.provider_id |> should.equal(Some("local-message-id"))
   let #(head, _body) = report(peer)
   string.starts_with(head, "POST /email HTTP/1.1\r\n") |> should.be_true
