@@ -1,11 +1,59 @@
 # Correio
 
-- Correio provides transactional email and passwordless verification for Gleam on Erlang.
-- Applications own accounts, templates, delivery scheduling, browser policy, and sessions.
-- Messages work with SMTP, Postmark, or an explicitly owned capture adapter. Passwordless verification works independently with memory or PostgreSQL storage.
-- Version `0.1.0` is pre-release and not yet published to Hex.
+Correio provides transactional email and independent passwordless challenge verification for Gleam applications on Erlang. Applications own templates, accounts, permission decisions, browser policy, and sessions. Delivery and challenge verification remain separate; the application connects them explicitly. Version `0.1.0` is pre-release and not yet published to Hex; it requires Gleam 1.18 or later.
 
-## Construct email
+## When to use it
+
+- Send transactional email through an injected sender, with SMTP or the optional Postmark adapter.
+- Add magic-link or email-code verification to an existing application while keeping its account and session model.
+- Test the application's real email flow without a provider, or inspect captured mail in a development-only inbox.
+
+Correio is a fit for application-owned email and verification flows. It does not provide an outbox, delivery scheduler, bounce processing, inbound mail, account management, or an authentication server.
+
+## Capabilities
+
+- Typed address and message values with text or HTML bodies, attachments, recipient roles, headers, and a separate delivery envelope.
+- MIME rendering and message admission before sending.
+- Bounded SMTP submission with STARTTLS or implicit TLS, and an optional Postmark adapter.
+- A common `delivery.Sender` function and distinct `Accepted`, `NotSent`, `Rejected`, and `OutcomeUnknown` results.
+- Bounded capture with checkpoints and timed matching helpers for testing application email flows.
+- An optional read-only HTTP handler for inspecting a capture in a development environment.
+- Magic-link and email-code challenges bound to an application subject, purpose, scope, and destination.
+- Opaque verification evidence and recovery handles for uncertain challenge operations.
+- In-memory challenge storage or an optional PostgreSQL adapter over a caller-owned pool.
+
+## Install
+
+Add Correio as a Git dependency in your application's `gleam.toml`:
+
+```toml
+[dependencies]
+correio = { git = "https://github.com/gleam-dream/correio.git", ref = "main" }
+```
+
+Gleam records the resolved commit in `manifest.toml`; commit both files so builds use the same revision.
+
+## How it fits
+
+`Message`, injected `delivery.Sender`, and `passwordless.Service(a)` over a `Store(a)` are the main contracts. Capture and in-memory state run in explicitly owned, bounded OTP processes; PostgreSQL borrows the application's named pool. The application chooses when to send a challenge and what to do after verification.
+
+```mermaid
+flowchart LR
+  app[Application]
+  app -->|compose email| message[Validated message]
+  message --> sender{delivery.Sender}
+  sender --> smtp[SMTP]
+  sender --> postmark[Postmark]
+  sender --> capture[Capture for tests]
+  app -->|issue and verify| auth[Passwordless service]
+  auth --> store[Memory or PostgreSQL store]
+  auth -->|challenge or verified evidence| app
+```
+
+`Message` construction does not send mail. This shortened excerpt makes a text and HTML alternative; the complete example adds Cc/Bcc, an inline attachment, a custom header, and an envelope sender. The [complete message example](apps/passwordless_demo/src/usage/compose_message.gleam)
+supplies imports from `correio/address`, `correio/message` and `gleam/result`.
+
+Both snippets below come from example modules that the repository gate runs.
 
 <!-- prettier-ignore-start -->
 
@@ -35,15 +83,10 @@ let assert Ok(mail) =
 
 <!-- prettier-ignore-end -->
 
-- The assertions above validate fixed configuration. Parse user input through ordinary `Result` handling.
-- Add recipients, reply-to, custom headers, attachments, and an explicit envelope sender through `correio/message`.
-- `delivery.Sender` is a function from `Message` to `Outcome`. Inject `smtp.sender`, `correio_postmark.sender`, or `capture.sender` where the application needs delivery.
-- `Accepted` means that the provider accepted the submission, not that the message reached an inbox. `NotSent`, `Rejected`, and `OutcomeUnknown` mean that submission did not occur, was refused, or may have occurred.
-- Correio does not retry email, because retrying `OutcomeUnknown` can deliver a duplicate.
-
-## Test an application email flow
-
-Here `welcome` is application code that accepts an injected sender and builds its message.
+An injected sender keeps application code independent of its transport. The
+[capture example](apps/passwordless_demo/src/usage/capture_flow.gleam) supplies
+the `capture`, `delivery` and `testing` imports and lets a test inspect the
+message produced by the same application flow.
 
 <!-- prettier-ignore-start -->
 
@@ -81,74 +124,37 @@ let assert Ok(Nil) = capture.stop(outbox)
 
 <!-- prettier-ignore-end -->
 
-- Record the checkpoint before triggering the flow. Earlier messages cannot satisfy the helper.
-- Give each parallel test its own capture, or match an application correlation field in a custom predicate.
-- The optional [`correio_mailbox`](adapters/correio_mailbox) package adds a read-only development inbox for the same capture.
-- Try the complete local flow without PostgreSQL or credentials:
+The `welcome` function in the [runnable example](apps/passwordless_demo/src/usage/capture_flow.gleam) is application code that accepts a `delivery.Sender` and constructs its message.
 
-```sh
-nix develop -c sh -c 'cd apps/passwordless_demo && gleam run -m dev'
-```
+## Passwordless verification
 
-## Verify a native application subject
+The application supplies a stable secret of 32–4096 cryptographically random bytes across restarts and a store for its native subject type. `passwordless.issue` returns a challenge and answer; it does not send email. The application delivers the answer, verifies it with the current trusted destination, applies its own account policy, and publishes its own session. See the [memory example](apps/passwordless_demo/src/usage/passwordless_memory.gleam) for issue, verify, refusal, revocation, and recovery, or the [PostgreSQL example](apps/passwordless_demo/src/usage/passwordless_postgres.gleam) for explicit migration and cleanup.
 
-The runnable example defines `AccountId(Int)` and a demonstration key; supply your own stable secret in an application.
+## Packages and examples
 
-<!-- prettier-ignore-start -->
+- [`correio_postmark`](adapters/correio_postmark) submits through Postmark. Its [usage test](adapters/correio_postmark/test/usage_test.gleam) uses a local scripted peer and dummy token.
+- [`correio_postgres`](adapters/correio_postgres) provides durable challenge storage through a caller-owned named Pog pool.
+- [`correio_mailbox`](adapters/correio_mailbox) reads captured messages; the application owns the HTTP server and access control.
+- [`passwordless_demo`](apps/passwordless_demo) is a local browser example, not a production authentication application.
+- [Runnable usage examples](apps/passwordless_demo/src/usage) cover delivery outcomes, capture, the development mailbox, and passwordless verification.
 
-<!-- snips: apps/passwordless_demo/src/usage/passwordless_memory.gleam#passwordless-service -->
-```gleam
-let assert Ok(runtime) = memory.start(1000)
-let assert Ok(auth) =
-  passwordless.new(memory.store(runtime), "example-app", "login", demo_key)
-let assert Ok(auth) = passwordless.with_policy(auth, 60_000, 3, 3_600_000)
-```
+For Postmark, add token redaction before starting the caller-owned HTTP client. Recordings also retain message bodies and addresses unless you enable body redaction; see the [adapter README](adapters/correio_postmark/README.md) for details.
 
-<!-- prettier-ignore-end -->
+## Important behavior
 
-- Supply a stable application secret of 32–4096 cryptographically random bytes. Never use a literal demonstration key in a deployed application.
-- `passwordless.issue(auth, AccountId(42), destination, MagicLink)` returns an opaque challenge, and `EmailCode(8)` selects an eight-digit code. Issuing a challenge does not send email.
-- `passwordless.verify(auth, id, destination, answer)` returns opaque `Verified(AccountId)` evidence after confirmed consumption. The application checks account policy and publishes its own session.
-- `IssueUnknown`, `VerifyUnknown`, and `RevokeUnknown` carry recovery handles. Call the corresponding `recover_*` function to resolve the original operation.
-- Retain confirmed evidence when session publication fails, and retry publication with `verification_id` as the idempotency identity.
-- Memory state is bounded and disappears on restart. Use the PostgreSQL adapter for shared durable authority.
-
-## Runnable examples
-
-Every topic below is code that compiles and runs in the repository gate, so it stays current with the library. The snippets above are excerpts of the message, capture and passwordless examples.
-
-| Topic                                  | Example                                                                                 |
-| -------------------------------------- | --------------------------------------------------------------------------------------- |
-| Construct a message                    | [`compose_message`](apps/passwordless_demo/src/usage/compose_message.gleam)             |
-| Deliver and act on each outcome        | [`delivery_outcomes`](apps/passwordless_demo/src/usage/delivery_outcomes.gleam)         |
-| Test an application email flow         | [`capture_flow`](apps/passwordless_demo/src/usage/capture_flow.gleam)                   |
-| Mount the development mailbox          | [`development_mailbox`](apps/passwordless_demo/src/usage/development_mailbox.gleam)     |
-| Verify a native subject, with recovery | [`passwordless_memory`](apps/passwordless_demo/src/usage/passwordless_memory.gleam)     |
-| Verify over PostgreSQL                 | [`passwordless_postgres`](apps/passwordless_demo/src/usage/passwordless_postgres.gleam) |
-| Send through Postmark                  | [`usage_test`](adapters/correio_postmark/test/usage_test.gleam)                         |
-
-## Packages and example
-
-| Package                                         | Responsibility                                                  |
-| ----------------------------------------------- | --------------------------------------------------------------- |
-| `correio`                                       | Message values, MIME, SMTP, capture, verification, memory store |
-| [`correio_postgres`](adapters/correio_postgres) | Atomic durable challenge transitions and cleanup                |
-| [`correio_postmark`](adapters/correio_postmark) | Typed Postmark email submission                                 |
-| [`correio_mailbox`](adapters/correio_mailbox)   | Read-only development inbox and safe formatting preview         |
-| [`passwordless_demo`](apps/passwordless_demo)   | Local browser flow and application-native Warden composition    |
-
-- The core package uses Hex dependencies. The Postmark adapter and example depend on the unpublished [HTTP Gun](https://github.com/gleam-dream/http_gun) and [Warden](https://github.com/gleam-dream/warden) as Git dependencies on `main`; their `manifest.toml` files lock the resolved revisions.
+- `Accepted` means the provider accepted the submission; it does not confirm inbox delivery. `OutcomeUnknown` means submission may have occurred, so do not retry it automatically.
+- Captured messages can contain login links, codes, addresses, and blind recipients. Mount the mailbox only in development and put it behind application access control.
+- Memory storage is bounded and disappears on restart. The PostgreSQL adapter requires explicit migration and cleanup; the application owns the pool.
+- Keep a challenge operation's recovery handle when its outcome is unknown and resolve that operation through `recover_issue`, `recover_verify`, or `recover_revoke`.
 
 ## Development
 
+Run the repository gate with a local scripted SMTP/HTTP peer and disposable PostgreSQL:
+
 ```sh
 nix develop -c scripts/check
-nix develop -c scripts/e2e
-nix develop -c scripts/oracles
-nix develop -c scripts/benchmark
 ```
 
-- Tests use local scripted peers and a disposable PostgreSQL. They need no provider credentials or existing database.
-- [Oracle comparisons](docs/ORACLE.md) record their pinned upstream sources and limits, and [benchmarks](docs/BENCHMARKS.md) record their method and dated results. Each links to the other.
-- The [design](docs/design/design.typ) defines each context's contracts and limits. Its [context map](docs/CONTEXT-MAP.md), [coverage map](docs/COVERAGE.md), and [decision records](docs/adr) hold vocabulary, ownership, and rationale.
-- Code is licensed under [Apache 2.0](LICENSE). Oracle inputs are fetched from their upstream projects at run time and are not committed.
+The [design](docs/design/design-layer.pdf) defines contracts and ownership. [Benchmarks](docs/BENCHMARKS.md) are historical single-host observations without performance thresholds.
+
+Code is licensed under [Apache 2.0](LICENSE).

@@ -1,6 +1,6 @@
 # Correio development mailbox
 
-A read-only HTTP handler that lists and shows the messages in a caller-owned capture. Behavior, limits, and the preview rules are specified in the [delivery design](../../docs/design/delivery/design.typ).
+A read-only HTTP handler that lists and shows the messages in a caller-owned capture. Behavior, limits, and the preview rules are specified in the [delivery design](../../docs/design/design-layer.pdf).
 
 Runnable example: [`development_mailbox`](../../apps/passwordless_demo/src/usage/development_mailbox.gleam), run by the repository gate.
 

@@ -1,6 +1,6 @@
 # Correio Postmark adapter
 
-Sends one Correio message through Postmark's email endpoint. Acceptance rules, limits, and redaction rules are specified in the [delivery design](../../docs/design/delivery/design.typ).
+Sends one Correio message through Postmark's email endpoint. Acceptance rules, limits, and redaction rules are specified in the [delivery design](../../docs/design/design-layer.pdf).
 
 Runnable example: [`test/usage_test.gleam`](test/usage_test.gleam) sends through a local scripted peer in this package's tests. The snippet below mirrors it.
 

@@ -3,7 +3,7 @@
 - A local executable example of email login that composes Correio delivery and verification. It is not a deployed authentication application.
 - The application owns its native `AccountId`, account policy, browser state, sessions, and session publication.
 - `src/usage` holds one runnable example per usage topic, run by `test/usage_test.gleam`. `identity.gleam` maps Correio email evidence and Warden OIDC identity into distinct principal variants. `readme_examples.gleam` compiles the root README examples.
-- Browser behavior, bounds, and ownership are specified in the [browser demo design](../../docs/design/demo/design.typ).
+- Browser behavior, bounds, and ownership are specified in the [browser demo design](../../docs/design/design-layer.pdf).
 
 ## Run
 
