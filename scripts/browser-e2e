@@ -2,7 +2,8 @@
 # Real Chromium cookie and cross-site email-link navigation against local peers.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-command -v "${CORREIO_BROWSER_CHROMIUM:-chromium}" >/dev/null
+CORREIO_BROWSER_CHROMIUM=$(command -v "${CORREIO_BROWSER_CHROMIUM:-chromium}")
+export CORREIO_BROWSER_CHROMIUM
 command -v node >/dev/null
 "${CORREIO_BROWSER_CHROMIUM:-chromium}" --version
 node --version
