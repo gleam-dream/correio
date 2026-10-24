@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Native local SMTP, PostgreSQL, HTTP-provider, and browser-consumer evidence.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+gleam test
+(
+  cd adapters/correio_postgres
+  ../../scripts/with-postgres.sh gleam test
+  bash check-ownership.sh
+)
+(
+  cd adapters/correio_postmark
+  gleam test
+)
+(
+  cd adapters/correio_mailbox
+  gleam test
+)
+(
+  cd apps/passwordless_demo
+  ../../scripts/with-postgres.sh gleam test
+)
+scripts/browser-e2e
