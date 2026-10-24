@@ -1,0 +1,100 @@
+[
+  {
+    "id": "text",
+    "from": { "address": "sender@example.test" },
+    "to": [{ "address": "reader@example.test" }],
+    "subject": "Plain message",
+    "text": "Hello world"
+  },
+  {
+    "id": "html",
+    "from": { "address": "sender@example.test" },
+    "to": [{ "address": "reader@example.test" }],
+    "subject": "HTML message",
+    "html": "<p>Hello <strong>world</strong></p>"
+  },
+  {
+    "id": "alternative",
+    "from": { "address": "sender@example.test" },
+    "to": [{ "address": "reader@example.test" }],
+    "subject": "Both bodies",
+    "text": "Hello world",
+    "html": "<p>Hello world</p>"
+  },
+  {
+    "id": "recipients",
+    "from": { "address": "sender@example.test", "name": "Sender \"quoted\"" },
+    "to": [
+      { "address": "reader@example.test", "name": "Reader" },
+      { "address": "second@example.test", "name": "Second" }
+    ],
+    "cc": [{ "address": "copy@example.test" }],
+    "bcc": [
+      { "address": "blind@example.test" },
+      { "address": "reader@example.test" }
+    ],
+    "reply_to": { "address": "reply@example.test", "name": "Reply" },
+    "subject": "Recipient roles",
+    "text": "Hello",
+    "headers": {
+      "X-Request-ID": "fixture-4",
+      "List-Unsubscribe": "<https://example.test/unsubscribe>",
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"
+    }
+  },
+  {
+    "id": "unicode",
+    "from": { "address": "sender@example.test", "name": "João" },
+    "to": [{ "address": "reader@example.test", "name": "読者" }],
+    "subject": "Olá 世界",
+    "text": "Olá mundo 🌍"
+  },
+  {
+    "id": "attachment",
+    "from": { "address": "sender@example.test" },
+    "to": [{ "address": "reader@example.test" }],
+    "subject": "Binary attachment",
+    "text": "See attachment",
+    "attachments": [
+      {
+        "filename": "sample.bin",
+        "content_type": "application/octet-stream",
+        "body_base64": "AAECA//+",
+        "disposition": "attachment"
+      }
+    ]
+  },
+  {
+    "id": "mixed_alternative",
+    "from": { "address": "sender@example.test" },
+    "to": [{ "address": "reader@example.test" }],
+    "subject": "Mixed alternative",
+    "text": "See attachment",
+    "html": "<p>See attachment</p>",
+    "attachments": [
+      {
+        "filename": "notes.txt",
+        "content_type": "text/plain",
+        "body_base64": "SGVsbG8gZmlsZQ==",
+        "disposition": "attachment"
+      }
+    ]
+  },
+  {
+    "id": "inline",
+    "from": { "address": "sender@example.test" },
+    "to": [{ "address": "reader@example.test" }],
+    "subject": "Inline image",
+    "text": "Picture",
+    "html": "<img src=\"cid:logo\">",
+    "attachments": [
+      {
+        "filename": "logo.png",
+        "content_type": "image/png",
+        "body_base64": "iVBORw0KGgo=",
+        "disposition": "inline",
+        "cid": "logo"
+      }
+    ]
+  }
+]

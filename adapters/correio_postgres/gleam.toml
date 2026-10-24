@@ -1,0 +1,17 @@
+name = "correio_postgres"
+version = "0.1.0"
+target = "erlang"
+gleam = ">= 1.18.0"
+licences = ["Apache-2.0"]
+description = "PostgreSQL atomic passwordless challenge storage for Correio."
+repository = { type = "github", user = "gleam-dream", repo = "correio" }
+
+[dependencies]
+correio = { path = "../.." }
+gleam_stdlib = ">= 0.70.0 and < 2.0.0"
+gleam_erlang = ">= 1.0.0 and < 2.0.0"
+gleam_otp = ">= 1.0.0 and < 2.0.0"
+pog = ">= 4.0.0 and < 5.0.0"
+
+[dev-dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"
