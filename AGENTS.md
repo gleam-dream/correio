@@ -29,7 +29,7 @@
 - Try the local login flow with `nix develop -c sh -c 'cd apps/passwordless_demo && gleam run -m dev'`.
 - `nix fmt -- PATH...` formats named files, `nix flake check` checks formatting, and the pre-commit hook formats and re-stages staged files.
 - `nix run .#design-gate-render -- docs/design docs/design/design-layer.pdf` renders the design.
-- Unpublished sibling packages (HTTP Gun and Hellhound, with what they pull in) are Git dependencies pinned to verified commits; each `manifest.toml` is the lock. Update one by hand with `gleam update <package>` when its public contract changes. CI never restores a shared compiled dependency cache.
+- Adapters use Hex versions of Correio and HTTP Gun. The demo still uses a pinned Git Hellhound dependency and its qualified closure; each `manifest.toml` is the lock. Update dependencies with `gleam deps update <package>` when their public contracts change. CI never restores a shared compiled dependency cache.
 - Use repository-scoped Git only. Preserve sibling repositories and unrelated work.
 
 <!-- agent-skills:begin -->
