@@ -4,6 +4,19 @@ Sends one Correio message through Postmark's email endpoint. Acceptance rules, l
 
 Runnable example: [`test/usage_test.gleam`](test/usage_test.gleam) sends through a local scripted peer in this package's tests. The snippet below mirrors it.
 
+## Installation
+
+Add Correio and HTTP Gun from Hex and the Postmark adapter from its Git subdirectory:
+
+```toml
+[dependencies]
+correio = ">= 0.1.0 and < 0.2.0"
+http_gun = ">= 0.1.0 and < 0.2.0"
+correio_postmark = { git = "https://github.com/gleam-dream/correio.git", ref = "main", path = "adapters/correio_postmark" }
+```
+
+Commit `gleam.toml` and `manifest.toml` to retain the resolved versions and Git commit.
+
 ## Use
 
 This excerpt sends a message to the test's scripted loopback peer at `port`, using a dummy token and its `mail()` fixture. Production uses the application's server token and the default Postmark endpoint.

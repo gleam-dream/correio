@@ -1,6 +1,6 @@
 # Correio
 
-Correio provides transactional email and independent passwordless challenge verification for Gleam applications on Erlang. Applications own templates, accounts, permission decisions, browser policy, and sessions. Delivery and challenge verification remain separate; the application connects them explicitly. Version `0.1.0` is pre-release and not yet published to Hex; it requires Gleam 1.18 or later.
+Correio provides transactional email and independent passwordless challenge verification for Gleam applications on Erlang. Applications own templates, accounts, permission decisions, browser policy, and sessions. Delivery and challenge verification remain separate; the application connects them explicitly. It requires Gleam 1.18 or later.
 
 ## When to use it
 
@@ -24,14 +24,16 @@ Correio is a fit for application-owned email and verification flows. It does not
 
 ## Install
 
-Add Correio as a Git dependency in your application's `gleam.toml`:
+Add Correio from Hex:
 
-```toml
-[dependencies]
-correio = { git = "https://github.com/gleam-dream/correio.git", ref = "main" }
+```sh
+gleam add correio
 ```
 
-Gleam records the resolved commit in `manifest.toml`; commit both files so builds use the same revision.
+Commit `gleam.toml` and `manifest.toml` so builds use the same resolved versions.
+The optional [mailbox](adapters/correio_mailbox/README.md),
+[PostgreSQL](adapters/correio_postgres/README.md), and
+[Postmark](adapters/correio_postmark/README.md) adapters install from Git subdirectories.
 
 ## How it fits
 

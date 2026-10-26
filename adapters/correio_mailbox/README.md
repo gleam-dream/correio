@@ -4,6 +4,18 @@ A read-only HTTP handler that lists and shows the messages in a caller-owned cap
 
 Runnable example: [`development_mailbox`](../../apps/passwordless_demo/src/usage/development_mailbox.gleam), run by the repository gate.
 
+## Installation
+
+Add Correio from Hex and the mailbox adapter from its Git subdirectory:
+
+```toml
+[dependencies]
+correio = ">= 0.1.0 and < 0.2.0"
+correio_mailbox = { git = "https://github.com/gleam-dream/correio.git", ref = "main", path = "adapters/correio_mailbox" }
+```
+
+Commit `gleam.toml` and `manifest.toml` to retain the resolved versions and Git commit.
+
 ## Mount
 
 <!-- prettier-ignore-start -->
