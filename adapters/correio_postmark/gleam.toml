@@ -6,7 +6,7 @@ licences = ["Apache-2.0"]
 description = "Postmark delivery for Correio with caller-owned HTTP Gun resources."
 repository = { type = "github", user = "gleam-dream", repo = "correio" }
 [dependencies]
-correio = { path = "../.." }
+correio = ">= 0.1.0 and < 0.2.0"
 http_gun = { git = "https://github.com/gleam-dream/http_gun.git", ref = "b2fe1d7cd0ea121e679cdf2c4af5b078330c33e7" }
 gleam_stdlib = ">= 0.70.0 and < 2.0.0"
 gleam_http = ">= 4.4.0 and < 5.0.0"

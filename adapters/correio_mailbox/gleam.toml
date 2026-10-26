@@ -7,7 +7,7 @@ description = "Explicitly mounted development mailbox for Correio captures."
 repository = { type = "github", user = "gleam-dream", repo = "correio" }
 
 [dependencies]
-correio = { path = "../.." }
+correio = ">= 0.1.0 and < 0.2.0"
 gleam_stdlib = ">= 0.70.0 and < 2.0.0"
 gleam_http = ">= 4.4.0 and < 5.0.0"
 

@@ -7,7 +7,7 @@
 # You should check this file into your source control repository.
 
 packages = [
-  { name = "correio", version = "0.1.0", build_tools = ["gleam"], requirements = ["gen_smtp", "gleam_stdlib"], source = "local", path = "../.." },
+  { name = "correio", version = "0.1.0", build_tools = ["gleam"], requirements = ["gen_smtp", "gleam_stdlib"], otp_app = "correio", source = "hex", outer_checksum = "263F9C485158D5B44339185EBE0759024B8CEC337C4C3CC2B889D135E91C23F1" },
   { name = "cowlib", version = "2.21.0", build_tools = ["make", "rebar3"], requirements = [], otp_app = "cowlib", source = "hex", outer_checksum = "0960248773762A5319B3C17285028BC76F54F58EF0F9451367401BDF67B46274" },
   { name = "file_streams", version = "1.7.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "file_streams", source = "hex", outer_checksum = "62757932B5FAC14FC9D0EE69BC4694DC6EA9F0FE6E198F695711C4FCAC1F7A26" },
   { name = "filepath", version = "1.1.2", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "filepath", source = "hex", outer_checksum = "B06A9AF0BF10E51401D64B98E4B627F1D2E48C154967DA7AF4D0914780A6D40A" },
@@ -30,7 +30,7 @@ packages = [
 ]
 
 [requirements]
-correio = { path = "../.." }
+correio = { version = ">= 0.1.0 and < 0.2.0" }
 gleam_http = { version = ">= 4.4.0 and < 5.0.0" }
 gleam_json = { version = ">= 3.1.0 and < 4.0.0" }
 gleam_stdlib = { version = ">= 0.70.0 and < 2.0.0" }
