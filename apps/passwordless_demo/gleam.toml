@@ -8,7 +8,7 @@ description = "Local executable browser consumer of Correio passwordless verific
 correio = { path = "../.." }
 correio_mailbox = { path = "../../adapters/correio_mailbox" }
 correio_postgres = { path = "../../adapters/correio_postgres" }
-hellhound = { git = "https://github.com/gleam-dream/hellhound.git", ref = "2f3ac56d665218c3ce0f2b12e6ff11fd9e54bec6" }
+hellhound = ">= 0.1.0 and < 0.2.0"
 gleam_stdlib = ">= 0.70.0 and < 2.0.0"
 gleam_erlang = ">= 1.0.0 and < 2.0.0"
 gleam_http = ">= 4.4.0 and < 5.0.0"
