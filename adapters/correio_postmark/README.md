@@ -1,5 +1,9 @@
 # Correio Postmark adapter
 
+[![CI](https://github.com/gleam-dream/correio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gleam-dream/correio/actions/workflows/ci.yml)
+[![correio on Hex](https://img.shields.io/hexpm/v/correio?label=Hex%3A%20correio)](https://hex.pm/packages/correio)
+[![Gleam](https://img.shields.io/badge/Gleam-FFAFF3?logo=gleam&logoColor=000000)](https://gleam.run/)
+
 Sends one Correio message through Postmark's email endpoint. Acceptance rules, limits, and redaction rules are specified in the [delivery design](../../docs/design/design-layer.pdf).
 
 Runnable example: [`test/usage_test.gleam`](test/usage_test.gleam) sends through a local scripted peer in this package's tests. The snippet below mirrors it.

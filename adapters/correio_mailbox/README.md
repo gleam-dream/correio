@@ -1,5 +1,9 @@
 # Correio development mailbox
 
+[![CI](https://github.com/gleam-dream/correio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gleam-dream/correio/actions/workflows/ci.yml)
+[![correio on Hex](https://img.shields.io/hexpm/v/correio?label=Hex%3A%20correio)](https://hex.pm/packages/correio)
+[![Gleam](https://img.shields.io/badge/Gleam-FFAFF3?logo=gleam&logoColor=000000)](https://gleam.run/)
+
 A read-only HTTP handler that lists and shows the messages in a caller-owned capture. Behavior, limits, and the preview rules are specified in the [delivery design](../../docs/design/design-layer.pdf).
 
 Runnable example: [`development_mailbox`](../../apps/passwordless_demo/src/usage/development_mailbox.gleam), run by the repository gate.

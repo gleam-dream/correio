@@ -1,5 +1,9 @@
 # Correio
 
+[![CI](https://github.com/gleam-dream/correio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gleam-dream/correio/actions/workflows/ci.yml)
+[![correio on Hex](https://img.shields.io/hexpm/v/correio?label=Hex%3A%20correio)](https://hex.pm/packages/correio)
+[![Gleam](https://img.shields.io/badge/Gleam-FFAFF3?logo=gleam&logoColor=000000)](https://gleam.run/)
+
 Correio provides transactional email and independent passwordless challenge verification for Gleam applications on Erlang. Applications own templates, accounts, permission decisions, browser policy, and sessions. Delivery and challenge verification remain separate; the application connects them explicitly. It requires Gleam 1.18 or later.
 
 ## When to use it

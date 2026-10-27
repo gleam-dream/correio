@@ -1,5 +1,9 @@
 # Passwordless browser consumer
 
+[![CI](https://github.com/gleam-dream/correio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gleam-dream/correio/actions/workflows/ci.yml)
+[![correio on Hex](https://img.shields.io/hexpm/v/correio?label=Hex%3A%20correio)](https://hex.pm/packages/correio)
+[![Gleam](https://img.shields.io/badge/Gleam-FFAFF3?logo=gleam&logoColor=000000)](https://gleam.run/)
+
 - A local executable example of email login that composes Correio delivery and verification. It is not a deployed authentication application.
 - The application owns its native `AccountId`, account policy, browser state, sessions, and session publication.
 - `src/usage` holds one runnable example per usage topic, run by `test/usage_test.gleam`. `identity.gleam` maps Correio email evidence and Hellhound OIDC identity into distinct principal variants. `readme_examples.gleam` compiles the root README examples.

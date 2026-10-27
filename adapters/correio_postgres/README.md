@@ -1,5 +1,9 @@
 # Correio PostgreSQL store
 
+[![CI](https://github.com/gleam-dream/correio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gleam-dream/correio/actions/workflows/ci.yml)
+[![correio on Hex](https://img.shields.io/hexpm/v/correio?label=Hex%3A%20correio)](https://hex.pm/packages/correio)
+[![Gleam](https://img.shields.io/badge/Gleam-FFAFF3?logo=gleam&logoColor=000000)](https://gleam.run/)
+
 Atomic challenge storage through a caller-owned named Pog pool. Semantics, limits, and recovery rules are specified in the [passwordless design](../../docs/design/design-layer.pdf).
 
 Runnable example: [`passwordless_postgres`](../../apps/passwordless_demo/src/usage/passwordless_postgres.gleam), run against a disposable PostgreSQL by the repository gate.
