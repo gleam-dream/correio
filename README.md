@@ -12,7 +12,7 @@ Correio provides transactional email and independent passwordless challenge veri
 - Add magic-link or email-code verification to an existing application while keeping its account and session model.
 - Test the application's real email flow without a provider, or inspect captured mail in a development-only inbox.
 
-Correio is a fit for application-owned email and verification flows. It does not provide an outbox, delivery scheduler, bounce processing, inbound mail, account management, or an authentication server.
+Correio does not provide an outbox, delivery scheduler, bounce processing, inbound mail, account management, or an authentication server.
 
 ## Capabilities
 
@@ -56,10 +56,9 @@ flowchart LR
   auth -->|challenge or verified evidence| app
 ```
 
-`Message` construction does not send mail. This shortened excerpt makes a text and HTML alternative; the complete example adds Cc/Bcc, an inline attachment, a custom header, and an envelope sender. The [complete message example](apps/passwordless_demo/src/usage/compose_message.gleam)
-supplies imports from `correio/address`, `correio/message` and `gleam/result`.
+`Message` construction does not send mail. This excerpt makes a text and HTML alternative. The [complete example](apps/passwordless_demo/src/usage/compose_message.gleam) adds Cc/Bcc, an inline attachment, a custom header, and an envelope sender, with imports from `correio/address`, `correio/message` and `gleam/result`.
 
-Both snippets below come from example modules that the repository gate runs.
+The repository gate runs both example modules below.
 
 <!-- prettier-ignore-start -->
 
@@ -90,9 +89,8 @@ let assert Ok(mail) =
 <!-- prettier-ignore-end -->
 
 An injected sender keeps application code independent of its transport. The
-[capture example](apps/passwordless_demo/src/usage/capture_flow.gleam) supplies
-the `capture`, `delivery` and `testing` imports and lets a test inspect the
-message produced by the same application flow.
+[capture example](apps/passwordless_demo/src/usage/capture_flow.gleam) imports
+`capture`, `delivery` and `testing` to inspect mail from the same application flow.
 
 <!-- prettier-ignore-start -->
 
