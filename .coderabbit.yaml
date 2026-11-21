@@ -1,0 +1,495 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# Review policy for correio, derived by the coderabbit-config skill.
+# Each instruction names the skill it comes from; `policy` is the review policy
+# of coderabbit-config itself, and `repository` marks a rule beyond the catalog.
+#
+# Catalogs read:
+#   dash-skills        879841a61c3f83cd809edca9229c4a6bb7f909f8
+#   gleam-agent-tools  6a9ea2f647e787a32d3c7fa88d9c58c5b81ae9d7
+#
+# Governing skills: coderabbit-config (policy), gleam, gleam-lib, gleam-ffi,
+# correio, http-gun, hellhound, gleam-sql, modeling, testing, python, elixir,
+# design, tracker, gate, git.
+#
+# Governing dependency versions: correio 0.1.0 (this package, gleam.toml).
+# Locked in the manifest.toml of each package:
+#   gen_smtp 1.3.0 (root)
+#   http_gun 0.1.1 (adapters/correio_postmark, apps/passwordless_demo). The
+#     http-gun skill names 0.1.0; 0.1.1 changed default cassette redaction,
+#     so the skill's default-redaction rule is not taken.
+#   hellhound 0.1.0 (apps/passwordless_demo)
+#   pog 4.1.0 (adapters/correio_postgres, apps/passwordless_demo,
+#     oracles/correio_fixture)
+#   gleam_stdlib 1.0.5, gleam_erlang 1.3.0, gleam_http 4.4.0,
+#   gleam_json 3.1.0, gleeunit 1.11.0.
+language: en-US
+tone_instructions: >-
+  Literal and concise. Report only defects you can evidence from the diff, its
+  callers, the design, or a cited rule. One finding per cause. An empty review
+  is valid.
+early_access: false
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_instructions: |
+    Lead with the problem the change solves, then the response in one short
+    paragraph, then the public API, delivery-outcome or challenge-contract
+    effect, if any. Do not narrate the diff file by file.
+  review_status: true
+  commit_status: true
+  fail_commit_status: true
+  collapse_walkthrough: true
+  changed_files_summary: false
+  sequence_diagrams: false
+  estimate_code_review_effort: false
+  assess_linked_issues: true
+  related_issues: true
+  related_prs: false
+  suggested_labels: false
+  suggested_reviewers: false
+  auto_assign_reviewers: false
+  poem: false
+  in_progress_fortune: false
+  enable_prompt_for_ai_agents: true
+
+  auto_review:
+    enabled: true
+    drafts: false
+    auto_incremental_review: true
+    base_branches:
+      - main
+
+  # Rendered design and lock files.
+  path_filters:
+    - "!flake.lock"
+    - "!docs/design/design-layer.pdf"
+    - "!apps/passwordless_demo/package-lock.json"
+    - "!oracles/mix.lock"
+
+  path_instructions:
+    - path: "{src,adapters/*/src,apps/passwordless_demo/src}/**"
+      instructions: |
+        Review policy (policy).
+        - Design first. docs/COVERAGE.md maps each part to its owning section in
+          docs/design (contexts `delivery`, `passwordless`, `demo` and
+          `evidence`) and docs/adr. Flag code that contradicts that unit's
+          interface, invariants or side effects, and a change to designed
+          behavior with no change to its design. A fix that restores designed
+          behavior needs none. When code and design disagree, the design
+          changes first.
+        - Core abstractions. Flag a second representation of a concept the
+          design names (Address, Message, Sender, Outcome, Capture,
+          Checkpoint, Service, Challenge, Verified, the recovery handles,
+          Store), a name that differs from the CONTEXT.typ glossaries, and an
+          adapter or the demo calling past correio's public modules into the
+          Erlang modules behind them.
+        - Lean. Flag code no test, caller or unit needs: an unset option, an
+          unvaried parameter, a wrapper that adds no rule, an unreachable
+          branch. Say what to delete.
+        - Migration, never a legacy path. Flag a compatibility shim, a fallback
+          to an old format, a dual read or write, a deprecated alias, and a
+          flag that keeps old behavior. A change to a public module ships as a
+          breaking release with a migration note.
+        - Composable. In a public module, flag hidden call ordering, global
+          state, a mandatory framework where functions compose, a concept the
+          common caller must learn and does not need, and a module with two
+          responsibilities. Accounts, registration, permissions, browser
+          routes and sessions belong to the application (AGENTS.md).
+        - Test first. Flag a behavior change with no test that exercises it,
+          and a test bound to internals.
+        - Typed before foreign. Flag Erlang where Gleam does the job, an
+          unchecked cast, an untyped value that reaches domain logic
+          undecoded, and a crash on a routine failure.
+        - Silence. Report nothing that `gleam format`, the compiler with
+          warnings as errors, the tests or scripts/check decide, and no layout
+          or naming preference without a written rule.
+
+    - path: "{src,test,adapters,apps,oracles/correio_fixture}/**/*.gleam"
+      instructions: |
+        Gleam (gleam).
+        - Flag a module function, private included, without annotated
+          arguments and return type, and an imported function or constant used
+          unqualified.
+        - Flag a name against the conventions: `Json` not `JSON`,
+          conversions named `x_to_y` or `to_y` inside module `x`, `try_` only
+          for an error-propagating counterpart.
+        - Flag `Option` carrying a failure, and a change that merges omitted,
+          explicit false, empty and failed where they mean different things.
+        - Flag an error a caller must parse as a string to choose recovery.
+        - Flag independent optional fields or booleans standing for exclusive
+          states; they are variants.
+        - Flag a predicate check followed by `let assert` on the same shape,
+          and a catch-all branch that silently accepts a new variant, such as
+          a new `Outcome` or error variant.
+        - Flag `panic` or `let assert` handling a routine external failure in
+          a package's `src/`.
+        - Flag a refactor that changes observable errors, ordering or effects.
+        - Flag a compatibility branch with no comment saying why it exists.
+        - Flag `src/` importing a `test/` or `dev/` module or `gleeunit`.
+        - Flag a new process, module or generic machinery added only for
+          organization, and a local type replacing a compatible ecosystem type.
+
+    - path: "{src,adapters/*/src}/**/*.gleam"
+      instructions: |
+        Published library surface (gleam-lib). Exported constructors, fields,
+        variants, module paths and behavior of `correio` and of the
+        `correio_postgres`, `correio_postmark` and `correio_mailbox` adapters
+        are the compatibility surface; `internal_modules` in gleam.toml marks
+        instability, not access control.
+        - Flag a removed or changed export, variant, field or behavior in a
+          public module that the pull request does not call breaking, and a
+          change with no matching update to the usage example that shows it
+          (AGENTS.md).
+        - Flag a public signature that exposes an implementation-state type
+          parameter, and an adapter that replaces the application's native
+          subject or error type with its own.
+        - Flag an argument that does not affect behavior, a setter per field
+          where a record update works, and two public paths for one common
+          task.
+        - Flag configuration validated after a resource is allocated, and a
+          builder or extension protocol with no distinct use case.
+        - Flag an adapter that depends on another package's internals instead
+          of its public contract.
+        - Flag a deliberate crash on a failure the caller could act on; return
+          a structured error instead.
+        - Flag the library taking over policy that belongs to the
+          application: templates, scheduling, retry, accounts, sessions,
+          browser policy.
+
+    - path: "{src,test,adapters,apps,oracles/correio_fixture}/**/*.{gleam,erl}"
+      instructions: |
+        Foreign boundaries (gleam-ffi). Apply to `*.erl` files and to a Gleam
+        module that declares `@external`.
+        - Flag validation, branching or state transitions in Erlang that the
+          design gives to Gleam; foreign code performs the native call, the
+          representation conversion and the native sequencing that must stay
+          atomic.
+        - Flag an external that declares a native value to be a checked domain
+          value, `Dynamic` or a type variable that accepts every handle, and a
+          generic return that hides an unchecked cast.
+        - Flag Erlang that builds a Gleam `Result`, list or variant with a
+          shape that differs from the compiler's documented representation.
+        - Flag an expected native failure not mapped to the declared failure
+          value, a driver message exposed past the boundary, and code that
+          assumes Gleam catches a foreign exception.
+        - Flag a capture, store process, socket or monitor whose owner and
+          cleanup the change leaves unstated.
+        - Flag a timeout or cancellation reported as proof that a send or
+          commit did not happen.
+        - Flag a foreign function with no remaining caller.
+
+    - path: "{src,adapters,apps}/**/*.gleam"
+      instructions: |
+        Correio delivery and challenges (correio; rules for 0.1.0).
+        - Flag an address or message built without its checked constructor,
+          and user input whose constructor `Result` is asserted instead of
+          handled.
+        - Flag provider selection inside business code instead of a
+          `delivery.Sender` injected at setup.
+        - Flag SMTP without verified TLS outside a local test, and the
+          loopback plaintext constructor carrying credentials.
+        - Flag a match on `Outcome` that merges `Accepted`, `NotSent`,
+          `Rejected` and `OutcomeUnknown`, and a retry of `OutcomeUnknown` or
+          of any possibly transmitted message (AGENTS.md, ADR 0008).
+        - Flag acceptance treated as inbox arrival, and Message-ID used for
+          deduplication.
+        - Flag a Postmark HTTP client started or recorded without
+          `postmark.redact_token` and body redaction, and a 2xx status taken
+          as acceptance without the adapter's interpretation.
+        - Flag a capture without a checkpoint created before the flow it
+          inspects, a capture never stopped by its owner, and
+          `correio_mailbox` mounted without explicit development access
+          policy.
+        - Flag a passwordless service built without a stable random
+          application key, an issue that assumes it sends the email, and a
+          new challenge assumed to revoke an older one.
+        - Flag a magic link verified on GET, verification taken as account
+          permission, and account or session policy applied before `verify`
+          returns confirmed evidence (ADR 0007).
+        - Flag an `IssueUnknown`, `VerifyUnknown` or `RevokeUnknown` resolved
+          by a fresh issue or verify instead of the matching `recover_*`, and
+          a consumed answer verified again after session publication fails;
+          retry publication with `verification_id`.
+        - Flag a recovery handle persisted across restarts.
+
+    - path: "adapters/correio_postmark/{src,test}/**/*.gleam"
+      instructions: |
+        Outgoing HTTP (http-gun; locked 0.1.1). In a module that imports
+        `http_gun`:
+        - Flag a body decoded before `buffered.response.status` is checked; an
+          `Ok` transport result can hold a 404 or 503.
+        - Flag a shared client started by a short-lived request process.
+        - Flag a destination view that widens authority, loopback enabled
+          outside local tests, and TLS verification turned off.
+        - Flag a collection limit missing or larger than the payload the
+          adapter accepts, and a truncated body decoded as complete JSON.
+        - Flag a retry inside the adapter, a timeout or cancellation treated
+          as proof the request did nothing, and `MaybeSent` handled as
+          `NotSent` (ADR 0008).
+        - Flag a body opened with `open` and not closed on every path.
+        - Flag recording or playback chosen after startup, and a recording
+          whose finish result is ignored.
+
+    - path: "apps/passwordless_demo/{src,test}/**/*.gleam"
+      instructions: |
+        OIDC login (hellhound; rules for 0.1.0). In a module that imports
+        `hellhound`:
+        - Flag an account keyed by email instead of the verified
+          `(issuer, subject)` pair.
+        - Flag login treated as permission.
+        - Flag a `hellhound.new` call per request instead of one handle built
+          at setup and reused.
+        - Flag state, nonce or PKCE recreated by the demo instead of kept
+          from `begin_login` and `login_response`.
+        - Flag a `Recover` action turned into a fresh token exchange, and a
+          projected `Action` matched without every variant.
+        - Flag a token, session or recovery value written to logs instead of
+          rendered through a `describe_*` function.
+
+    - path: "{adapters/correio_postgres,apps/passwordless_demo,oracles/correio_fixture}/**/*.gleam"
+      instructions: |
+        PostgreSQL access (gleam-sql; rules for pog 4.1.0). In a module that
+        imports `pog`:
+        - Flag a value interpolated into SQL text instead of bound as a
+          parameter, and an identifier or ordering taken from input.
+        - Flag a query inside a transaction callback that uses the pool
+          instead of the callback's connection.
+        - Flag a transaction callback that replaces a failure with success.
+        - Flag a decoding failure after a write reported as no write, and any
+          error taken as proof that no write occurred; it reports unknown
+          with a recovery handle (ADR 0008).
+        - Flag an empty string silently stored as null, or null as empty.
+        - Flag a uniqueness or consumption invariant enforced only by an
+          application check, with no constraint, conditional write or lock.
+        - Flag a claim that an email send or another store commits atomically
+          with the database transaction.
+        - Flag a borrowed pool started or stopped by the adapter.
+
+    - path: "{src,adapters/*/src}/**/*.gleam"
+      instructions: |
+        Domain model (modeling). Applies to the message model, delivery
+        outcomes and the challenge lifecycle in `correio/passwordless` and
+        its stores.
+        - Flag conditional data held outside the variant that gives it
+          meaning, and a constrained value buildable without its constructor.
+        - Flag a challenge transition (issue, verify, consume, revoke,
+          recover) with an undefined refusal or re-entry, and state assigned
+          directly instead of through a domain verb.
+        - Flag a store commit with no conditional write, version check or
+          lock against a concurrent commit, and a conflict with no named
+          response.
+        - Flag expiry, consumption or destination checked from a stored
+          observation instead of rechecked when the operation runs.
+        - Flag a stored tag derived from a module or constructor name, and a
+          legacy stored value not decoded into the current model at the
+          boundary.
+
+    - path: "{test,adapters/*/test,apps/passwordless_demo/test}/**"
+      instructions: |
+        Tests (testing).
+        - Flag a test that confirms success through internals, private state,
+          a table query or a side channel where the public API can show it.
+        - Flag a mock of an internal collaborator, and an assertion on call
+          counts or call order.
+        - Flag a scenario outcome that no design rule states.
+        - Flag tests left in place for an interface the diff replaced.
+        - Flag a refusal, illegal transition or illegal input the change
+          introduces with no test through the public boundary.
+        - Flag a store or transport change with no test for timeout, lost
+          acknowledgement, duplicate delivery or contention where the change
+          touches them.
+        - Flag a test that reads a credential file or reaches a real
+          provider; use local scripted peers and a disposable PostgreSQL
+          (AGENTS.md).
+        - Flag a fake standing in for PostgreSQL where transactions or
+          constraints are under test.
+
+    - path: "{oracles,benchmarks}/**/*.py"
+      instructions: |
+        Python oracle and benchmark tooling (python).
+        - Flag `Any`, and an external value (file, JSON, process output)
+          used without parsing.
+        - Flag an abstract base class hierarchy; use `Protocol`.
+        - Flag mutable dataclasses inside the program, and exclusive states as
+          flags instead of tagged frozen dataclasses matched with
+          `assert_never`.
+        - Flag a parser model passed past the boundary.
+
+    - path: "oracles/**/*.{ex,exs}"
+      instructions: |
+        Elixir oracle harness (elixir).
+        - Flag a conditional in a function body where a function-head match
+          selects the behavior.
+        - Flag an expected failure returned as anything but `{:ok, value}` or
+          `{:error, reason}`, and a bare `nil` beside tagged results.
+        - Flag a rescue of an error the caller cannot handle.
+        - Flag `@enforce_keys` treated as validation.
+        - Flag an atom created from external input.
+        - Flag a process started for anything other than long-lived state or
+          supervised concurrent work.
+
+    - path: "docs/{design,adr}/**"
+      instructions: |
+        Design layer (design; policy).
+        - Fresh reader. The reviewer never saw the change being made. Flag a
+          changed unit that does not tell a reader with no memory what the
+          code does not say, and a unit that copies the code.
+        - Flag content the code states: payloads, fields, limits, timeouts,
+          function or file lists, queries. Name the rule it serves instead; a
+          file or symbol is allowed only where a reader needs it to find where
+          a rule is enforced.
+        - Flag session narration, progress notes, status or delivery history;
+          decisions and history go in an ADR (AGENTS.md).
+        - Flag a unit missing one of overview, interface, invariants, side
+          effects and verification; an empty part says "none".
+        - Flag a concept defined in a second home, a glossary term with two
+          meanings, and a retired term reused.
+        - Flag an edit to an accepted ADR's text instead of a superseding ADR,
+          and a changed date on a pending entry.
+
+    # issues/ is the tracker home AGENTS.md declares; it holds no issue yet.
+    - path: "issues/**/*.md"
+      instructions: |
+        Local tracker (tracker; AGENTS.md).
+        - Each issue file carries one `Status:` and one `Category:` header
+          with a value AGENTS.md lists.
+        - Flag an issue titled with a solution instead of the observable
+          problem, line numbers or solution code in an issue, and a horizontal
+          task such as "build the data layer".
+        - Flag an AI-written comment that does not start with
+          `AI-assisted contribution.`
+
+    - path: "{scripts/**,**/*.sh,flake.nix,lefthook.yml,.github/workflows/**}"
+      instructions: |
+        Gate (gate).
+        - Flag a check that passes or skips when its tool is missing; it
+          fails or reports unmeasured.
+        - Flag a tool not supplied through the Nix flake, and a command that
+          differs between local runs and CI.
+        - Flag a new check that encodes a layout, naming or README
+          convention, and a check that scripts what a tool already performs
+          (ADR 0010).
+        - Flag a replaced check that drops security or data-integrity
+          coverage, such as the PostgreSQL fault suite or the ownership
+          check.
+        - Flag a gate that keeps a formatting check but loses compilation or
+          behavior tests of the package, an adapter or the demo.
+        - Flag a benchmark turned into a gating threshold (ADR 0005), and an
+          oracle input committed instead of fetched at a pinned revision
+          (AGENTS.md).
+
+  pre_merge_checks:
+    title:
+      mode: "off"
+    description:
+      mode: warning
+    issue_assessment:
+      mode: "off"
+    docstrings:
+      mode: "off"
+    custom_checks:
+      - name: No weakened test or gate
+        mode: error
+        instructions: |
+          Source: policy, gate. Fail if the diff skips, deletes, disables or
+          loosens a test, an oracle comparison or a step of scripts/check,
+          scripts/e2e, scripts/oracles or CI (including dropping a package
+          from scripts/check, removing a case from oracles/manifest.json or
+          oracles/fixtures, or adding `continue-on-error`), and the pull
+          request description does not name the behavior that no longer
+          exists or the stronger check that replaces it. Pass otherwise.
+      - name: Behavior change carries its design
+        mode: warning
+        instructions: |
+          Source: policy, design. Warn if the diff changes public behavior, an
+          invariant, a delivery outcome or a challenge contract in src/ or
+          adapters/*/src with no change under docs/design or docs/adr, and the
+          pull request description does not say the change restores designed
+          behavior or preserves behavior. Pass for tests, tooling and
+          documentation-only changes.
+      - name: Breaking change is declared
+        mode: warning
+        instructions: |
+          Source: policy, gleam-lib. Warn if the diff removes or changes an
+          exported function, type, constructor, field or module path of
+          correio or of an adapter, and the pull
+          request description does not call the change breaking and give its
+          migration. Pass otherwise.
+      - name: Problem-first description
+        mode: warning
+        instructions: |
+          Source: git. Warn unless the pull request description gives the
+          problem, why it matters, one concrete example, the solution in one
+          paragraph, its trade-offs, and what was verified, with no file
+          tour, and its claims match the diff.
+      - name: No attribution text
+        mode: warning
+        instructions: |
+          Source: git. Warn if the pull request title or description contains
+          a co-author credit, `Co-Authored-By`, a "Generated with" or
+          "Generated by" line, or a line starting with the robot emoji.
+
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+    simplify:
+      enabled: false
+
+  tools:
+    gitleaks:
+      enabled: true
+    trufflehog:
+      enabled: true
+    actionlint:
+      enabled: true
+    zizmor:
+      enabled: true
+    shellcheck:
+      enabled: true
+    ruff:
+      enabled: true
+    # The repository formats Python with Ruff and runs no other Python,
+    # JavaScript, Markdown, YAML or prose linter; their findings would be
+    # preferences without a written rule (policy, Silence).
+    pylint:
+      enabled: false
+    flake8:
+      enabled: false
+    biome:
+      enabled: false
+    eslint:
+      enabled: false
+    oxc:
+      enabled: false
+    markdownlint:
+      enabled: false
+    languagetool:
+      enabled: false
+    yamllint:
+      enabled: false
+    github-checks:
+      enabled: true
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    # AGENTS.md and CLAUDE.md are read by default.
+    filePatterns:
+      - files: "docs/COVERAGE.md,docs/CONTEXT-MAP.md,docs/design/**/*.typ,docs/adr/*.md"
+        applyTo: "src/**,adapters/**,apps/**,test/**"
+      - files: "docs/ORACLE.md"
+        applyTo: "oracles/**"
+      - files: "docs/BENCHMARKS.md"
+        applyTo: "benchmarks/**,oracles/correio_fixture/**"
+  learnings:
+    scope: local
+  pull_requests:
+    scope: local
