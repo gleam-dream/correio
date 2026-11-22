@@ -230,6 +230,11 @@ reviews:
           hold credentials without `cassette.redact(script, policy)` first,
           and a cassette saved under `redaction.request_fields_only` whose
           response bodies carry tokens.
+        - Flag a call to an `http_gun` function that a release admitted by
+          the package's `http_gun` range in gleam.toml does not provide; a
+          suggestion that needs such a function, such as
+          `config.with_cipher_suites` or `cassette.redact`, raises that range
+          with it.
 
     - path: "apps/passwordless_demo/{src,test}/**/*.gleam"
       instructions: |
