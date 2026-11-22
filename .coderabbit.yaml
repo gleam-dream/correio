@@ -5,24 +5,12 @@
 # of coderabbit-config itself, and `repository` marks a rule beyond the catalog.
 #
 # Catalogs read:
-#   practice catalog (not public)  879841a61c3f83cd809edca9229c4a6bb7f909f8
-#   gleam-agent-tools  6a9ea2f647e787a32d3c7fa88d9c58c5b81ae9d7
+#   practice catalog (not public)  a56636a4eed7a0d644b89f5bb7c7d7c9692e0887
+#   gleam-agent-tools  d7b541cb885b3edbf25563b06aee97b28b66074f
 #
 # Governing skills: coderabbit-config (policy), gleam, gleam-lib, gleam-ffi,
 # correio, http-gun, hellhound, gleam-sql, modeling, testing, python, elixir,
 # design, tracker, gate, git.
-#
-# Governing dependency versions: correio 0.1.0 (this package, gleam.toml).
-# Locked in the manifest.toml of each package:
-#   gen_smtp 1.3.0 (root)
-#   http_gun 0.1.1 (adapters/correio_postmark, apps/passwordless_demo). The
-#     http-gun skill names 0.1.0; 0.1.1 changed default cassette redaction,
-#     so the skill's default-redaction rule is not taken.
-#   hellhound 0.1.0 (apps/passwordless_demo)
-#   pog 4.1.0 (adapters/correio_postgres, apps/passwordless_demo,
-#     oracles/correio_fixture)
-#   gleam_stdlib 1.0.5, gleam_erlang 1.3.0, gleam_http 4.4.0,
-#   gleam_json 3.1.0, gleeunit 1.11.0.
 language: en-US
 tone_instructions: >-
   Literal and concise. Report only defects you can evidence from the diff, its
@@ -183,7 +171,7 @@ reviews:
 
     - path: "{src,adapters,apps}/**/*.gleam"
       instructions: |
-        Correio delivery and challenges (correio; rules for 0.1.0).
+        Correio delivery and challenges (correio).
         - Flag an address or message built without its checked constructor,
           and user input whose constructor `Result` is asserted instead of
           handled.
@@ -217,13 +205,14 @@ reviews:
 
     - path: "adapters/correio_postmark/{src,test}/**/*.gleam"
       instructions: |
-        Outgoing HTTP (http-gun; locked 0.1.1). In a module that imports
-        `http_gun`:
+        Outgoing HTTP (http-gun). In a module that imports `http_gun`:
         - Flag a body decoded before `buffered.response.status` is checked; an
           `Ok` transport result can hold a 404 or 503.
         - Flag a shared client started by a short-lived request process.
         - Flag a destination view that widens authority, loopback enabled
-          outside local tests, and TLS verification turned off.
+          outside local tests, and TLS verification turned off or weakened;
+          a server that accepts only TLS 1.2 CBC suites takes
+          `config.with_cipher_suites(settings, config.OtpDefaultsAndTls12Cbc)`.
         - Flag a collection limit missing or larger than the payload the
           adapter accepts, and a truncated body decoded as complete JSON.
         - Flag a retry inside the adapter, a timeout or cancellation treated
@@ -232,11 +221,24 @@ reviews:
         - Flag a body opened with `open` and not closed on every path.
         - Flag recording or playback chosen after startup, and a recording
           whose finish result is ignored.
+        - Flag default redaction treated as removing every secret. It removes
+          common credential headers and replaces listed credential query and
+          form/JSON fields; add provider headers with `with_headers`, field
+          names with `with_query_parameters` or `with_body_fields`, and
+          `with_body` for other bodies.
+        - Flag `cassette.encode` of a hand-built or parsed script that can
+          hold credentials without `cassette.redact(script, policy)` first,
+          and a cassette saved under `redaction.request_fields_only` whose
+          response bodies carry tokens.
+        - Flag a call to an `http_gun` function that a release admitted by
+          the package's `http_gun` range in gleam.toml does not provide; a
+          suggestion that needs such a function, such as
+          `config.with_cipher_suites` or `cassette.redact`, raises that range
+          with it.
 
     - path: "apps/passwordless_demo/{src,test}/**/*.gleam"
       instructions: |
-        OIDC login (hellhound; rules for 0.1.0). In a module that imports
-        `hellhound`:
+        OIDC login (hellhound). In a module that imports `hellhound`:
         - Flag an account keyed by email instead of the verified
           `(issuer, subject)` pair.
         - Flag login treated as permission.
@@ -248,11 +250,14 @@ reviews:
           projected `Action` matched without every variant.
         - Flag a token, session or recovery value written to logs instead of
           rendered through a `describe_*` function.
+        - In a module that imports `hellhound/exchange` or
+          `hellhound/assertion`, flag `perform` on a client not supervised
+          with `exchange.supervised(client)`, and a signing JWK that carries
+          an unused `alg` or `kid`.
 
     - path: "{adapters/correio_postgres,apps/passwordless_demo,oracles/correio_fixture}/**/*.gleam"
       instructions: |
-        PostgreSQL access (gleam-sql; rules for pog 4.1.0). In a module that
-        imports `pog`:
+        PostgreSQL access (gleam-sql). In a module that imports `pog`:
         - Flag a value interpolated into SQL text instead of bound as a
           parameter, and an identifier or ordering taken from input.
         - Flag a query inside a transaction callback that uses the pool
