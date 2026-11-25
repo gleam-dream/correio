@@ -14,7 +14,7 @@ fn wire_fields(raw: BitArray) -> Result(List(#(String, BitArray)), Nil)
 /// parser decodes from it. Every rendered message must parse without defects,
 /// use only CRLF line breaks, and keep each line within 998 bytes.
 fn rendered(mail: message.Message) -> #(String, List(#(String, BitArray))) {
-  let assert Ok(raw) = mime.render(mail)
+  let assert Ok(mime.Rendered(bytes: raw, ..)) = mime.render(mail)
   let assert Ok(fields) = wire_fields(raw)
   field(fields, "defects") |> should.equal("0")
   field(fields, "bare-line-breaks") |> should.equal("0")

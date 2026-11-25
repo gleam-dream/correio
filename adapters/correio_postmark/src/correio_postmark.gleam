@@ -418,8 +418,10 @@ fn response(
 ) -> delivery.Outcome {
   case status {
     429 -> delivery.Rejected(delivery.Temporary)
-    400 | 401 | 403 | 404 | 405 | 413 | 415 | 422 ->
-      delivery.Rejected(delivery.Permanent)
+    // Postmark refuses a missing or wrong server token before it processes the
+    // message, so nothing was submitted and the recipients were not judged.
+    401 | 403 -> delivery.NotSent(delivery.AuthenticationFailed)
+    400 | 404 | 405 | 413 | 415 | 422 -> delivery.Rejected(delivery.Permanent)
     status if status >= 200 && status < 300 -> {
       let decoder = {
         use code <- decode.field("ErrorCode", decode.int)

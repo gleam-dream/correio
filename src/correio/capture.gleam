@@ -4,7 +4,7 @@
 import correio/delivery
 import correio/message.{type Message}
 import correio/mime
-import gleam/option.{None}
+import gleam/option.{None, Some}
 
 pub opaque type Capture {
   Capture(Handle)
@@ -40,11 +40,15 @@ pub fn start(capacity: Int) -> Result(Capture, Error) {
 pub fn send(capture: Capture, message: Message) -> delivery.Outcome {
   case mime.render(message) {
     Error(error) -> delivery.NotSent(delivery.InvalidMessage(error))
-    Ok(_) -> {
+    Ok(rendered) -> {
       let Capture(handle) = capture
       case record(handle, message) {
         Stored ->
-          delivery.Accepted(delivery.Receipt(None, message.envelope(message).1))
+          delivery.Accepted(delivery.Receipt(
+            Some(rendered.message_id),
+            None,
+            message.envelope(message).1,
+          ))
         Full -> delivery.NotSent(delivery.CapacityReached)
         Stopped -> delivery.NotSent(delivery.CaptureUnavailable)
         Uncertain -> delivery.OutcomeUnknown

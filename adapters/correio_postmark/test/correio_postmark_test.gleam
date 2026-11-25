@@ -178,6 +178,14 @@ pub fn provider_refusals_and_uncertainty_are_distinct_test() {
   check_response(200, "{\"MessageID\":\"id\"}", delivery.OutcomeUnknown)
 }
 
+/// A refused server token is an authentication failure before submission,
+/// never a refusal of the recipients.
+pub fn refused_server_token_is_authentication_failure_test() {
+  let body = "{\"ErrorCode\":10,\"Message\":\"Bad or missing API token\"}"
+  check_response(401, body, delivery.NotSent(delivery.AuthenticationFailed))
+  check_response(403, body, delivery.NotSent(delivery.AuthenticationFailed))
+}
+
 pub fn disconnect_after_request_is_unknown_without_retry_test() {
   let #(port, peer) = peer(CloseAfterRequest)
   let client = client()

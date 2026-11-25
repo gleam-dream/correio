@@ -136,7 +136,7 @@ pub fn limits(config: Config, limits: Limits) -> Config {
 pub fn send(config: Config, message: Message) -> Outcome {
   case mime.render_with_limits(message, config.limits) {
     Error(error) -> delivery.NotSent(delivery.InvalidMessage(error))
-    Ok(raw) -> {
+    Ok(rendered) -> {
       let #(sender, recipients) = message.envelope(message)
       case
         submit(
@@ -148,10 +148,15 @@ pub fn send(config: Config, message: Message) -> Outcome {
           config.trust_roots,
           address.email(sender),
           list.map(recipients, address.email),
-          raw,
+          rendered.bytes,
         )
       {
-        Accepted -> delivery.Accepted(delivery.Receipt(None, recipients))
+        Accepted ->
+          delivery.Accepted(delivery.Receipt(
+            Some(rendered.message_id),
+            None,
+            recipients,
+          ))
         BeforeSend(error) -> delivery.NotSent(error)
         Refused(rejection) -> delivery.Rejected(rejection)
         Uncertain -> delivery.OutcomeUnknown
