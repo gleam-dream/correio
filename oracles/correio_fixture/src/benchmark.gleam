@@ -9,6 +9,7 @@ import gleam/bit_array
 import gleam/erlang/process
 import gleam/json
 import gleam/list
+import gleam/otp/static_supervisor as supervisor
 import gleam/string
 import pog
 
@@ -29,9 +30,14 @@ pub fn main() {
       "login",
       key,
     )
-  let assert Ok(runtime) = memory.start(100_000)
+  let challenges = process.new_name("benchmark_challenges")
+  let assert Ok(memory_config) = memory.new(challenges, 100_000)
+  let assert Ok(challenge_supervisor) =
+    supervisor.new(supervisor.OneForOne)
+    |> supervisor.add(memory.supervised(memory_config))
+    |> supervisor.start
   let assert Ok(local) =
-    passwordless.new(memory.store(runtime), "benchmark", "login", key)
+    passwordless.new(memory.store(challenges), "benchmark", "login", key)
   let mail = message_fixture()
   let mime_case = fn() {
     case mime.render(mail) {
@@ -88,7 +94,8 @@ pub fn main() {
     ])
     |> json.to_string
   write(env("CORREIO_BENCHMARK_RESULTS") <> "/samples.json", output)
-  let assert Ok(_) = memory.stop(runtime)
+  process.unlink(challenge_supervisor.pid)
+  process.kill(challenge_supervisor.pid)
   stop(database.pid)
 }
 

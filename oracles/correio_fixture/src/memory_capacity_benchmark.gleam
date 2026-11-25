@@ -3,9 +3,11 @@
 
 import correio/passwordless
 import correio/passwordless/memory
+import gleam/erlang/process
 import gleam/int
 import gleam/io
 import gleam/list
+import gleam/otp/static_supervisor as supervisor
 
 const key = <<"benchmark-only-application-key-not-for-deployment">>
 
@@ -45,10 +47,16 @@ fn run(
   prepare: fn(Clock, passwordless.Service(Int)) -> fn() -> String,
 ) -> Nil {
   let clock = clock_new(0)
-  let assert Ok(runtime) =
-    memory.start_with_clock(capacity, fn() { clock_get(clock) })
+  let challenges = process.new_name("benchmark_challenges")
+  let assert Ok(config) = memory.new(challenges, capacity)
+  let assert Ok(challenge_supervisor) =
+    supervisor.new(supervisor.OneForOne)
+    |> supervisor.add(
+      memory.supervised(memory.with_clock(config, fn() { clock_get(clock) })),
+    )
+    |> supervisor.start
   let assert Ok(service) =
-    passwordless.new(memory.store(runtime), "benchmark", "login", key)
+    passwordless.new(memory.store(challenges), "benchmark", "login", key)
   // Validity 100 s, retention 1 day, on the injected millisecond clock.
   let assert Ok(service) =
     passwordless.with_policy(service, 100_000, 5, 86_400_000)
@@ -80,8 +88,8 @@ fn run(
     <> int.to_string(nth(latencies, samples - 1))
     <> "}",
   )
-  let assert Ok(_) = memory.stop(runtime)
-  Nil
+  process.unlink(challenge_supervisor.pid)
+  process.kill(challenge_supervisor.pid)
 }
 
 fn fill(service: passwordless.Service(Int)) -> Nil {
