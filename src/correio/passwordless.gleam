@@ -121,7 +121,10 @@ pub fn issue(
     EmailCode(digits) if digits >= 6 && digits <= 10 -> Ok(random_code(digits))
     EmailCode(_) -> Error(InvalidIssue(InvalidCodeLength))
   })
-  use now <- result.try(service.store.now() |> result.map_error(IssueFailed))
+  use instant <- result.try(
+    service.store.now() |> result.map_error(IssueFailed),
+  )
+  let now = instant.milliseconds
   let id = random_token()
   let command =
     store.Issue(
@@ -134,6 +137,7 @@ pub fn issue(
       now + service.ttl_ms,
       now + service.ttl_ms + service.retention_ms,
       service.attempts,
+      instant.incarnation,
     )
   recover_issue(IssueRecovery(service, command, answer))
 }

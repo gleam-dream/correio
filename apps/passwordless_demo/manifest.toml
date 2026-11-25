@@ -9,7 +9,7 @@
 packages = [
   { name = "backoff", version = "1.1.6", build_tools = ["rebar3"], requirements = [], otp_app = "backoff", source = "hex", outer_checksum = "CF0CFFF8995FB20562F822E5CC47D8CCF664C5ECDC26A684CBE85C225F9D7C39" },
   { name = "bigi", version = "4.1.1", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "bigi", source = "hex", outer_checksum = "44FEDF1DF5C1F426A80B67C32B976D0828D66524E11BDC2DD22B78D37C883BA7" },
-  { name = "correio", version = "0.1.0", build_tools = ["gleam"], requirements = ["gen_smtp", "gleam_stdlib"], source = "local", path = "../.." },
+  { name = "correio", version = "0.1.0", build_tools = ["gleam"], requirements = ["gen_smtp", "gleam_erlang", "gleam_otp", "gleam_stdlib"], source = "local", path = "../.." },
   { name = "correio_mailbox", version = "0.1.1", build_tools = ["gleam"], requirements = ["correio", "gleam_http", "gleam_stdlib"], source = "local", path = "../../adapters/correio_mailbox" },
   { name = "correio_postgres", version = "0.1.1", build_tools = ["gleam"], requirements = ["correio", "gleam_erlang", "gleam_otp", "gleam_stdlib", "pog"], source = "local", path = "../../adapters/correio_postgres" },
   { name = "cowlib", version = "2.21.0", build_tools = ["make", "rebar3"], requirements = [], otp_app = "cowlib", source = "hex", outer_checksum = "0960248773762A5319B3C17285028BC76F54F58EF0F9451367401BDF67B46274" },
@@ -48,6 +48,7 @@ correio_mailbox = { path = "../../adapters/correio_mailbox" }
 correio_postgres = { path = "../../adapters/correio_postgres" }
 gleam_erlang = { version = ">= 1.0.0 and < 2.0.0" }
 gleam_http = { version = ">= 4.4.0 and < 5.0.0" }
+gleam_otp = { version = ">= 1.0.0 and < 2.0.0" }
 gleam_stdlib = { version = ">= 0.70.0 and < 2.0.0" }
 gleeunit = { version = ">= 1.0.0 and < 2.0.0" }
 hellhound = { version = ">= 0.3.0 and < 0.4.0" }

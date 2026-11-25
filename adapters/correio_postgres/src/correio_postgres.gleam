@@ -8,6 +8,7 @@ import gleam/erlang/process
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
+import gleam/string
 import pog
 
 pub type Codec(a) {
@@ -22,7 +23,9 @@ pub fn new(pool: process.Name(pog.Message), codec: Codec(a)) -> store.Store(a) {
   configured(pog.named_connection(pool), codec, 5000)
 }
 
-/// Query deadlines bound lock waits and exchanges. A timeout remains Unknown.
+/// Query deadlines bound lock waits and exchanges. A statement that times out
+/// inside a transaction whose rollback the server acknowledged is
+/// `Unavailable`. A timeout that leaves a commit uncertain is `Unknown`.
 pub fn with_timeout(
   pool: process.Name(pog.Message),
   codec: Codec(a),
@@ -40,7 +43,12 @@ fn configured(
   timeout: Int,
 ) -> store.Store(a) {
   store.Store(
-    now: fn() { protect(fn() { now(db, timeout) }) },
+    now: fn() {
+      protect(fn() {
+        now(db, timeout)
+        |> result.map(store.Instant(_, incarnation))
+      })
+    },
     issue: fn(command) {
       transaction(db, fn(connection) {
         issue(connection, codec, timeout, command)
@@ -144,6 +152,11 @@ fn migrate_schema(db: pog.Connection) -> Result(Nil, store.Fault) {
   |> result.map_error(write_fault)
 }
 
+/// PostgreSQL rows outlive every application and database restart, so the
+/// store has one incarnation. The insert itself refuses a command whose
+/// challenge has expired, and a consumed row stays until its retention ends.
+const incarnation = "postgresql"
+
 fn now(db: pog.Connection, timeout: Int) -> Result(Int, store.Fault) {
   use rows <- result.try(
     pog.query(
@@ -152,7 +165,7 @@ fn now(db: pog.Connection, timeout: Int) -> Result(Int, store.Fault) {
     |> pog.timeout(timeout)
     |> pog.returning(decode.at([0], decode.int))
     |> pog.execute(db)
-    |> result.map_error(read_fault),
+    |> result.map_error(uncommitted_fault),
   )
   case rows.rows {
     [time] -> Ok(time)
@@ -185,7 +198,7 @@ fn issue(
     |> pog.parameter(pog.int(command.attempts))
     |> pog.timeout(timeout)
     |> pog.execute(db)
-    |> result.map_error(write_fault),
+    |> result.map_error(uncommitted_fault),
   )
   use found <- result.try(find_locked(db, codec, timeout, command.id))
   use time <- result.try(now(db, timeout))
@@ -215,7 +228,7 @@ fn find_locked(
     |> pog.timeout(timeout)
     |> pog.returning(row_decoder(codec))
     |> pog.execute(db)
-    |> result.map_error(read_fault),
+    |> result.map_error(uncommitted_fault),
   )
   case rows.rows {
     [] -> Ok(None)
@@ -300,11 +313,16 @@ fn save_transition(
       |> pog.timeout(timeout)
       |> pog.execute(db)
       |> result.map(fn(_) { Nil })
-      |> result.map_error(write_fault)
+      |> result.map_error(uncommitted_fault)
     }
   }
 }
 
+/// Statements inside the callback report `uncommitted_fault`. Pog returns
+/// `TransactionRolledBack` only after the server acknowledged the rollback,
+/// so such a fault is definite. `TransactionQueryError` carries a failed
+/// checkout, begin, commit, or rollback; only a failed checkout proves that
+/// nothing ran.
 fn transaction(
   db: pog.Connection,
   function: fn(pog.Connection) -> Result(a, store.Fault),
@@ -313,24 +331,48 @@ fn transaction(
     case pog.transaction(db, function) {
       Ok(value) -> Ok(value)
       Error(pog.TransactionRolledBack(error)) -> Error(error)
+      Error(pog.TransactionQueryError(pog.ConnectionUnavailable)) ->
+        Error(store.Unavailable)
       Error(pog.TransactionQueryError(_)) -> Error(store.Unknown)
     }
   })
 }
 
-fn read_fault(error: pog.QueryError) -> store.Fault {
+/// Fault of a statement that commits nothing by itself: a read, or a write
+/// inside a transaction. A lost reply is `Unavailable` here because the
+/// acknowledged rollback or commit, not this statement, decides what is stored.
+fn uncommitted_fault(error: pog.QueryError) -> store.Fault {
+  refused(error)
+}
+
+/// Fault of a statement that commits by itself. A lost reply leaves its
+/// effect unknown.
+fn write_fault(error: pog.QueryError) -> store.Fault {
   case error {
-    pog.UnexpectedResultType(_) -> store.IncompatibleData
-    _ -> store.Unavailable
+    pog.QueryTimeout -> store.Unknown
+    _ -> refused(error)
   }
 }
 
-fn write_fault(error: pog.QueryError) -> store.Fault {
+/// Fault of a statement that did not run, that the server refused, or whose
+/// reply was lost. A refused statement stores nothing.
+fn refused(error: pog.QueryError) -> store.Fault {
   case error {
-    pog.ConnectionUnavailable -> store.Unavailable
-    pog.UnexpectedArgumentCount(_, _) | pog.UnexpectedArgumentType(_, _) ->
-      store.IncompatibleData
-    _ -> store.Unknown
+    pog.ConnectionUnavailable | pog.QueryTimeout -> store.Unavailable
+    pog.UnexpectedArgumentCount(_, _)
+    | pog.UnexpectedArgumentType(_, _)
+    | pog.UnexpectedResultType(_)
+    | pog.ConstraintViolated(_, _, _) -> store.IncompatibleData
+    // SQLSTATE classes 22 (data exception), 23 (integrity constraint
+    // violation), and 42 (syntax error or access rule violation, which
+    // includes a missing table) mean the schema or stored data does not match
+    // this adapter. Other classes, such as lock, resource, and cancellation
+    // errors, can pass on a later attempt.
+    pog.PostgresqlError(code, _, _) ->
+      case string.slice(code, 0, 2) {
+        "22" | "23" | "42" -> store.IncompatibleData
+        _ -> store.Unavailable
+      }
   }
 }
 

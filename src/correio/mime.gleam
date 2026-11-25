@@ -7,14 +7,20 @@ import gleam/list
 import gleam/option.{type Option}
 import gleam/result
 
-pub fn render(message: Message) -> Result(BitArray, MessageError) {
+/// A serialized message and the Message-ID header value written into it,
+/// angle brackets included. Each render generates a new Message-ID.
+pub type Rendered {
+  Rendered(bytes: BitArray, message_id: String)
+}
+
+pub fn render(message: Message) -> Result(Rendered, MessageError) {
   render_with_limits(message, message.default_limits())
 }
 
 pub fn render_with_limits(
   message: Message,
   limits: Limits,
-) -> Result(BitArray, MessageError) {
+) -> Result(Rendered, MessageError) {
   use _ <- result.try(message.validate(message, limits))
   let v = message.view(message)
   let addresses = fn(values) {
@@ -25,7 +31,7 @@ pub fn render_with_limits(
       let a = message.attachment_view(a)
       #(a.filename, a.content_type, a.bytes, a.disposition)
     })
-  use raw <- result.try(encode(
+  use #(bytes, message_id) <- result.try(encode(
     #(address.email(v.from), address.name(v.from)),
     addresses(v.to),
     addresses(v.cc),
@@ -36,8 +42,8 @@ pub fn render_with_limits(
     v.headers,
     attachments,
   ))
-  case bit_array.byte_size(raw) <= message.maximum_submission_bytes(limits) {
-    True -> Ok(raw)
+  case bit_array.byte_size(bytes) <= message.maximum_submission_bytes(limits) {
+    True -> Ok(Rendered(bytes, message_id))
     False -> Error(message.SubmissionTooLarge)
   }
 }
@@ -59,4 +65,4 @@ fn encode(
   reply_to: Option(#(String, Option(String))),
   headers: List(#(String, String)),
   attachments: List(#(String, String, BitArray, message.Disposition)),
-) -> Result(BitArray, MessageError)
+) -> Result(#(BitArray, String), MessageError)

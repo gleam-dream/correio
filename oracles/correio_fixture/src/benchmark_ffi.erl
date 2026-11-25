@@ -1,5 +1,9 @@
 -module(benchmark_ffi).
 -export([micros/0, parallel/1, metadata/0]).
+-export([clock_new/1, clock_get/1, clock_set/2]).
+clock_new(N) -> R = atomics:new(1, [{signed, true}]), atomics:put(R, 1, N), R.
+clock_get(R) -> atomics:get(R, 1).
+clock_set(R, N) -> atomics:put(R, 1, N), nil.
 micros() -> erlang:monotonic_time(microsecond).
 metadata() ->
     {unicode:characters_to_binary(erlang:system_info(otp_release)),

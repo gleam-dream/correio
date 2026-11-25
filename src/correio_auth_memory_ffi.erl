@@ -1,28 +1,51 @@
 -module(correio_auth_memory_ffi).
 -behaviour(gen_server).
--export([start/1, call/2, stop/1, system_milliseconds/0]).
+-export([start/4, call/2, incarnation/0, system_milliseconds/0]).
+-export([index_new/0, index_insert/3, index_delete/3, index_first/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
-start(State) ->
-    case gen_server:start(?MODULE, {self(), State}, []) of
+%% Runs in the supervisor, so the store is linked to its supervisor only and
+%% registered under Name. Cleanup runs inside the store process every
+%% Interval milliseconds.
+start(Name, State, Cleanup, Interval) ->
+    case gen_server:start_link({local, Name}, ?MODULE, {State, Cleanup, Interval}, []) of
         {ok, Pid} -> {ok, Pid};
-        {error, _} -> {error, nil}
+        {error, Reason} -> {error, {abnormal, Reason}}
     end.
-call(Pid, Function) ->
-    try gen_server:call(Pid, {apply, Function}, 5000) of
+%% A name that no process holds is unavailable storage: the command was never
+%% delivered. Any other exit leaves the command's effect unknown.
+call(Name, Function) ->
+    try gen_server:call(Name, {apply, Function}, 5000) of
         Reply -> {ok, Reply}
     catch
         exit:{noproc, _} -> {error, unavailable};
         exit:_ -> {error, unknown}
     end.
-stop(Pid) ->
-    try gen_server:stop(Pid, normal, 5000) of ok -> {ok, nil}
-    catch exit:{noproc, _} -> {ok, nil}; exit:_ -> {error, unknown} end.
+%% 128 random bits name one lifetime of a store process.
+incarnation() -> base64:encode(crypto:strong_rand_bytes(16), #{mode => urlsafe, padding => false}).
 system_milliseconds() -> erlang:system_time(millisecond).
-init({Owner, State}) -> {ok, {monitor(process, Owner), State}}.
-handle_call({apply, Function}, _From, {Owner, State}) ->
+%% An ordered set of {Time, Id} entries.
+index_new() -> gb_sets:new().
+index_insert(Index, At, Id) -> gb_sets:add_element({At, Id}, Index).
+index_delete(Index, At, Id) -> gb_sets:del_element({At, Id}, Index).
+index_first(Index) ->
+    case gb_sets:is_empty(Index) of
+        true -> {error, nil};
+        false -> {ok, gb_sets:smallest(Index)}
+    end.
+-record(server, {state, cleanup, interval}).
+init({State, Cleanup, Interval}) ->
+    erlang:send_after(Interval, self(), cleanup),
+    {ok, #server{state = State, cleanup = Cleanup, interval = Interval}}.
+handle_call({apply, Function}, _From, #server{state = State} = Server) ->
     {Next, Reply} = Function(State),
-    {reply, Reply, {Owner, Next}}.
-handle_cast(_, State) -> {noreply, State}.
-handle_info({'DOWN', Ref, process, _, _}, {Ref, _} = State) -> {stop, normal, State};
-handle_info(_, State) -> {noreply, State}.
+    {reply, Reply, Server#server{state = Next}}.
+handle_cast(_, Server) -> {noreply, Server}.
+%% The next pass is scheduled after this one ends, so passes never queue up.
+%% A pass that stopped at its batch limit continues behind the waiting commands.
+handle_info(cleanup, #server{state = State, cleanup = Cleanup, interval = Interval} = Server) ->
+    {Next, More} = Cleanup(State),
+    Delay = case More of true -> 0; false -> Interval end,
+    erlang:send_after(Delay, self(), cleanup),
+    {noreply, Server#server{state = Next}};
+handle_info(_, Server) -> {noreply, Server}.

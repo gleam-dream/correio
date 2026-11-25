@@ -1,10 +1,11 @@
-//// Verify an application-native subject with the in-memory store: issue,
-//// verify, refusals, revocation and recovery of an unknown outcome.
+//// Verify an application-native subject with the in-memory store: supervision,
+//// issue, verify, refusals, revocation and recovery of an unknown outcome.
 
 import correio/passwordless
 import correio/passwordless/memory
 import correio/passwordless/store
 import gleam/erlang/process
+import gleam/otp/static_supervisor as supervisor
 
 /// Correio is generic over the application's subject type.
 pub type AccountId {
@@ -32,9 +33,16 @@ fn losing_first_acknowledgement(
 
 pub fn run() -> Nil {
   // snips-start: passwordless-service
-  let assert Ok(runtime) = memory.start(1000)
+  // The store runs under the application's supervisor and is reached through
+  // a name created once at start-up. A restarted store is empty.
+  let challenges = process.new_name("example_app_challenges")
+  let assert Ok(config) = memory.new(challenges, 1000)
+  let assert Ok(_) =
+    supervisor.new(supervisor.OneForOne)
+    |> supervisor.add(memory.supervised(config))
+    |> supervisor.start
   let assert Ok(auth) =
-    passwordless.new(memory.store(runtime), "example-app", "login", demo_key)
+    passwordless.new(memory.store(challenges), "example-app", "login", demo_key)
   let assert Ok(auth) = passwordless.with_policy(auth, 60_000, 3, 3_600_000)
   // snips-end: passwordless-service
 
@@ -98,7 +106,7 @@ pub fn run() -> Nil {
   )
 
   // Configuration errors are typed: a short key is never accepted.
-  assert passwordless.new(memory.store(runtime), "example-app", "login", <<
+  assert passwordless.new(memory.store(challenges), "example-app", "login", <<
       1,
       2,
       3,
@@ -110,7 +118,7 @@ pub fn run() -> Nil {
   let lost = process.new_subject()
   let assert Ok(recovering) =
     passwordless.new(
-      losing_first_acknowledgement(memory.store(runtime), lost),
+      losing_first_acknowledgement(memory.store(challenges), lost),
       "example-app",
       "login",
       demo_key,
@@ -132,8 +140,6 @@ pub fn run() -> Nil {
     )
   let assert Ok(recovered) = passwordless.recover_verify(recovery)
   assert passwordless.subject(recovered) == AccountId(9)
-
-  let assert Ok(Nil) = memory.stop(runtime)
   Nil
 }
 

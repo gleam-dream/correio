@@ -1,6 +1,12 @@
 //// Trusted adapter protocol. Applications normally use passwordless.Service.
 //// Implementations must serialize each command, sample milliseconds since Unix
 //// epoch after acquiring serialization, and return Unknown for ambiguous writes.
+////
+//// An incarnation names one lifetime of a store's rows. A store whose rows do
+//// not survive a restart starts each lifetime with a new, unguessable
+//// incarnation, and refuses an `Issue` stamped with another incarnation as
+//// `IssueExpired`. A recovered issue therefore never inserts a challenge into a
+//// store that lost the row it may have written.
 
 import gleam/list
 
@@ -47,6 +53,11 @@ pub type Row(a) {
   )
 }
 
+/// A store's current time and incarnation, read together.
+pub type Instant {
+  Instant(milliseconds: Int, incarnation: String)
+}
+
 pub type Issue(a) {
   Issue(
     id: String,
@@ -58,6 +69,7 @@ pub type Issue(a) {
     expires_at: Int,
     retain_until: Int,
     attempts: Int,
+    incarnation: String,
   )
 }
 
@@ -82,7 +94,7 @@ pub type Receipt(a) {
 
 pub type Store(a) {
   Store(
-    now: fn() -> Result(Int, Fault),
+    now: fn() -> Result(Instant, Fault),
     issue: fn(Issue(a)) -> Result(Row(a), Fault),
     verify: fn(Verify) -> Result(Result(Receipt(a), Refusal), Fault),
     revoke: fn(Revoke) -> Result(Result(Nil, Refusal), Fault),

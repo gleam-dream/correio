@@ -8,6 +8,8 @@ import correio/passwordless
 import correio/passwordless/memory
 import correio/smtp
 import correio/testing
+import gleam/erlang/process
+import gleam/otp/static_supervisor as supervisor
 
 pub fn send_welcome() -> delivery.Outcome {
   let assert Ok(from) = address.parse("hello@example.com")
@@ -27,11 +29,17 @@ pub type AccountId {
   AccountId(Int)
 }
 
+/// The store's supervisor is linked to the caller and stops with it.
 pub fn service(key: BitArray) {
-  let assert Ok(runtime) = memory.start(1000)
+  let challenges = process.new_name("example_app_challenges")
+  let assert Ok(config) = memory.new(challenges, 1000)
+  let assert Ok(_) =
+    supervisor.new(supervisor.OneForOne)
+    |> supervisor.add(memory.supervised(config))
+    |> supervisor.start
   let assert Ok(auth) =
-    passwordless.new(memory.store(runtime), "example-app", "login", key)
-  #(runtime, auth)
+    passwordless.new(memory.store(challenges), "example-app", "login", key)
+  auth
 }
 
 /// Application callback receives the injected capture sender.

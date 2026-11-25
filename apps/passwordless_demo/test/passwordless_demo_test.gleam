@@ -3,7 +3,6 @@ import correio/capture
 import correio/delivery
 import correio/message
 import correio/passwordless as auth
-import correio/passwordless/memory
 import correio/passwordless/store
 import correio/testing
 import correio_mailbox
@@ -264,7 +263,7 @@ pub fn http_cross_device_code_and_changed_account_policy_test() {
 }
 
 pub fn readme_memory_example_is_executable_test() {
-  let #(runtime, service) = readme_examples.service(key)
+  let service = readme_examples.service(key)
   let assert Ok(challenge) =
     auth.issue(
       service,
@@ -280,7 +279,6 @@ pub fn readme_memory_example_is_executable_test() {
       auth.challenge_answer(challenge),
     )
   auth.subject(evidence) |> should.equal(readme_examples.AccountId(42))
-  memory.stop(runtime) |> should.equal(Ok(Nil))
 }
 
 @external(erlang, "correio_demo_test_ffi", "database_url")
@@ -388,9 +386,7 @@ pub fn owner_exit_closes_http_listener_test() {
   let subject = process.new_subject()
   let owner =
     process.spawn_unlinked(fn() {
-      let assert Ok(memory) = memory.start(10)
-      let assert Ok(service) =
-        auth.new(memory.store(memory), "owner-test", "login", key)
+      let service = readme_examples.service(key)
       let assert Ok(app) = demo.start(service)
       process.send(subject, demo.port(app))
       process.receive_forever(process.new_subject())

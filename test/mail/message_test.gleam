@@ -13,8 +13,8 @@ pub fn bcc_is_envelope_only_test() {
   let assert Ok(mail) = message.new(from, to, "Hello", message.Text("World"))
   let mail = message.add_bcc(mail, hidden)
   message.envelope(mail).1 |> list.length |> should.equal(2)
-  let assert Ok(raw) = mime.render(mail)
-  let assert Ok(raw) = bit_array.to_string(raw)
+  let assert Ok(rendered) = mime.render(mail)
+  let assert Ok(raw) = bit_array.to_string(rendered.bytes)
   raw |> string.contains("secret@example.com") |> should.be_false
   address.email(from) |> should.equal("sender@example.com")
 }
@@ -100,8 +100,8 @@ pub fn binary_attachment_and_text_decode_independently_test() {
       <<0, 255, 128, 13, 10>>,
       message.AttachmentFile,
     )
-  let assert Ok(raw) = mail |> message.attach(file) |> mime.render
-  wire_semantics(raw) |> should.be_true
+  let assert Ok(rendered) = mail |> message.attach(file) |> mime.render
+  wire_semantics(rendered.bytes) |> should.be_true
 }
 
 pub fn structured_custom_headers_preserve_wire_syntax_test() {
@@ -115,8 +115,8 @@ pub fn structured_custom_headers_preserve_wire_syntax_test() {
     )
   let assert Ok(mail) =
     message.header(mail, "List-Unsubscribe-Post", "List-Unsubscribe=One-Click")
-  let assert Ok(raw) = mime.render(mail)
-  let assert Ok(raw) = bit_array.to_string(raw)
+  let assert Ok(rendered) = mime.render(mail)
+  let assert Ok(raw) = bit_array.to_string(rendered.bytes)
   string.contains(
     raw,
     "List-Unsubscribe: <https://example.test/unsubscribe>\r\n",
@@ -140,4 +140,17 @@ pub fn terminal_line_feed_cannot_bypass_field_validation_test() {
   |> should.be_error
   message.attachment("file.txt", "text/plain", <<>>, message.Inline("image\n"))
   |> should.be_error
+}
+
+pub fn render_returns_the_message_id_it_writes_test() {
+  let assert Ok(a) = address.parse("a@example.com")
+  let assert Ok(mail) = message.new(a, a, "Subject", message.Text("body"))
+  let assert Ok(rendered) = mime.render(mail)
+  let assert Ok(raw) = bit_array.to_string(rendered.bytes)
+  string.starts_with(rendered.message_id, "<") |> should.be_true
+  string.ends_with(rendered.message_id, ">") |> should.be_true
+  string.contains(raw, "\r\nMessage-ID: " <> rendered.message_id <> "\r\n")
+  |> should.be_true
+  let assert Ok(again) = mime.render(mail)
+  { again.message_id != rendered.message_id } |> should.be_true
 }

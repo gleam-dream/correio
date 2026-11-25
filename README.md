@@ -41,7 +41,7 @@ The optional [mailbox](adapters/correio_mailbox/README.md),
 
 ## How it fits
 
-`Message`, injected `delivery.Sender`, and `passwordless.Service(a)` over a `Store(a)` are the main contracts. Capture and in-memory state run in explicitly owned, bounded OTP processes; PostgreSQL borrows the application's named pool. The application chooses when to send a challenge and what to do after verification.
+`Message`, injected `delivery.Sender`, and `passwordless.Service(a)` over a `Store(a)` are the main contracts. Capture runs in an explicitly owned, bounded OTP process, and the in-memory store runs as a bounded child of the application's supervisor; PostgreSQL borrows the application's named pool. The application chooses when to send a challenge and what to do after verification.
 
 ```mermaid
 flowchart LR
@@ -148,7 +148,7 @@ For Postmark, add token redaction before starting the caller-owned HTTP client. 
 
 - `Accepted` means the provider accepted the submission; it does not confirm inbox delivery. `OutcomeUnknown` means submission may have occurred, so do not retry it automatically.
 - Captured messages can contain login links, codes, addresses, and blind recipients. Mount the mailbox only in development and put it behind application access control.
-- Memory storage is bounded and disappears on restart. The PostgreSQL adapter requires explicit migration and cleanup; the application owns the pool.
+- Memory storage is bounded, runs only as a child of the application's supervisor (`memory.supervised`), and is reached by the name it was registered under (`memory.store`). A restart empties it. A full memory store discards expired, unconsumed challenges to admit new ones and removes rows past retention on its own timer; rate-limit issuance in the application. The PostgreSQL adapter requires explicit migration and cleanup; the application owns the pool.
 - Keep a challenge operation's recovery handle when its outcome is unknown and resolve that operation through `recover_issue`, `recover_verify`, or `recover_revoke`.
 
 ## Development

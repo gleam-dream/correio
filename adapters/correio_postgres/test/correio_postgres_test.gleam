@@ -6,6 +6,7 @@ import gleam/erlang/process
 import gleam/int
 import gleam/list
 import gleam/result
+import gleam/string
 import gleeunit
 import gleeunit/should
 import pog
@@ -378,4 +379,73 @@ pub fn challenge_survives_pool_restart_and_stopped_pool_is_typed_test() {
     )
   auth.subject(evidence) |> should.equal(Account(9))
   stop_pool(restarted.pid)
+}
+
+const absent = "0000000000000000000000000000000000000000000"
+
+fn unreachable() -> Pool {
+  // Nothing listens on port 1, so the pool never holds a connection.
+  let name = process.new_name("correio_pg_unreachable")
+  let assert Ok(config) = pog.url_config(name, "postgres://app@127.0.0.1:1/app")
+  let assert Ok(started) = config |> pog.pool_size(1) |> pog.start
+  Pool(started.pid, started.data, name)
+}
+
+fn unmigrated() -> Pool {
+  let admin = connect()
+  let assert Ok(_) =
+    pog.query("drop database if exists correio_unmigrated")
+    |> pog.execute(admin.data)
+  let assert Ok(_) =
+    pog.query("create database correio_unmigrated") |> pog.execute(admin.data)
+  stop_pool(admin.pid)
+  let name = process.new_name("correio_pg_unmigrated")
+  let assert Ok(config) =
+    pog.url_config(
+      name,
+      // The disposable cluster's URL ends in its database name, "app".
+      string.drop_end(database_url(), 3) <> "correio_unmigrated",
+    )
+  let assert Ok(started) = config |> pog.pool_size(1) |> pog.start
+  Pool(started.pid, started.data, name)
+}
+
+pub fn pool_without_a_connection_is_unavailable_not_unknown_test() {
+  let db = unreachable()
+  let backing = postgres.new(db.name, codec())
+  backing.verify(store.Verify(absent, absent, "test", "login", email, absent))
+  |> should.equal(Error(store.Unavailable))
+  backing.revoke(store.Revoke(absent, "test", "login"))
+  |> should.equal(Error(store.Unavailable))
+  backing.issue(store.Issue(
+    absent,
+    Account(1),
+    "test",
+    "login",
+    email,
+    absent,
+    2,
+    3,
+    5,
+    "postgresql",
+  ))
+  |> should.equal(Error(store.Unavailable))
+  backing.cleanup(10) |> should.equal(Error(store.Unavailable))
+  auth.revoke(service(db), absent)
+  |> should.equal(Error(auth.RevokeFailed(store.Unavailable)))
+  stop_pool(db.pid)
+}
+
+pub fn missing_schema_is_a_definite_fault_test() {
+  let db = unmigrated()
+  let backing = postgres.new(db.name, codec())
+  auth.issue(service(db), Account(1), email, auth.MagicLink)
+  |> should.equal(Error(auth.IssueFailed(store.IncompatibleData)))
+  auth.revoke(service(db), absent)
+  |> should.equal(Error(auth.RevokeFailed(store.IncompatibleData)))
+  backing.cleanup(10) |> should.equal(Error(store.IncompatibleData))
+  // The rolled-back transaction left the connection usable.
+  postgres.migrate(db.data) |> should.equal(Ok(Nil))
+  let assert Ok(_) = auth.issue(service(db), Account(1), email, auth.MagicLink)
+  stop_pool(db.pid)
 }
