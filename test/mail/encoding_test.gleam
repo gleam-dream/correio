@@ -211,6 +211,12 @@ pub fn long_values_fold_within_line_limits_test() {
   let assert Ok(mail) = message.new(a, a, unbroken, message.Text("body"))
   let #(_, fields) = rendered(mail)
   field(fields, "subject") |> should.equal(unbroken)
+  // A run of spaces counts toward the line it starts, so a long run is
+  // emitted as encoded words too.
+  let spaced = "a" <> string.repeat(" ", 1000) <> "b"
+  let assert Ok(mail) = message.new(a, a, spaced, message.Text("body"))
+  let #(_, fields) = rendered(mail)
+  field(fields, "subject") |> should.equal(spaced)
   let padded = "  two leading and one trailing space "
   let assert Ok(mail) = message.new(a, a, padded, message.Text("body"))
   let #(_, fields) = rendered(mail)
@@ -248,6 +254,10 @@ pub fn text_transfer_encoding_choice_test() {
     // the text, the largest size that keeps it.
     #("Olá", "quoted-printable", "Olá"),
     #("日本語", "base64", "日本語"),
+    #("日本語\n日本語", "base64", "日本語\r\n日本語"),
+    // Quoted-printable would be more than twice this text, because each "="
+    // triples.
+    #("é\n=====", "base64", "é\r\n====="),
     #("lone\rreturn", "base64", "lone\rreturn"),
   ]
   |> list.each(fn(case_) {

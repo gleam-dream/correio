@@ -90,19 +90,28 @@ mailbox({Email, {some, Name}}) -> [display_name(Name), <<" <">>, Email, <<">">>]
 headers(Pairs) -> [[N, <<": ">>, V, <<"\r\n">>] || {N,V} <- Pairs].
 
 %% A subject of printable ASCII is emitted as written and folded before
-%% spaces, so unfolding restores it exactly. A subject that could be read as
-%% an encoded word, that starts or ends with a space, or that holds a word too
-%% long for one line is emitted as encoded words, like any non-ASCII subject.
+%% spaces, so unfolding restores it exactly. Each folded line is one chunk: a
+%% word with the spaces before it. A subject that could be read as an encoded
+%% word, that starts or ends with a space, or that holds a chunk too long for
+%% one line is emitted as encoded words, like any non-ASCII subject.
 subject(Value) ->
     case plain_subject(Value) of
-        true -> fold(re:run(Value, <<"(?:^| +)[^ ]+">>, [global, {capture, first, binary}]), 9);
+        {true, Chunks} -> fold(Chunks, 9);
         false -> encoded_words(Value)
     end.
 plain_subject(Value) ->
-    printable_ascii(Value) andalso binary:match(Value, <<"=?">>) =:= nomatch
-        andalso matches(Value, <<"\\A[^ ](?:.*[^ ])?\\z">>)
-        andalso not matches(Value, <<"[^ ]{900}">>).
-fold({match, Chunks}, Used) ->
+    Plain = printable_ascii(Value) andalso binary:match(Value, <<"=?">>) =:= nomatch
+        andalso matches(Value, <<"\\A[^ ](?:.*[^ ])?\\z">>),
+    case Plain of
+        false -> false;
+        true ->
+            {match, Chunks} = re:run(Value, <<"(?:^| +)[^ ]+">>, [global, {capture, first, binary}]),
+            case lists:all(fun([C]) -> byte_size(C) < 900 end, Chunks) of
+                true -> {true, Chunks};
+                false -> false
+            end
+    end.
+fold(Chunks, Used) ->
     [[First] | Rest] = Chunks,
     [First | fold_chunks([C || [C] <- Rest], Used + byte_size(First))].
 fold_chunks([], _) -> [];
@@ -169,15 +178,17 @@ text_encoding(Text, Lines) ->
         %% such bytes cannot fit and is not encoded twice.
         false ->
             case 2 * high_bytes(Text, 0) > byte_size(Text) of
-                true -> {<<"base64">>, base64_lines(base64:encode(Text))};
+                true -> {<<"base64">>, crlf_base64(Lines)};
                 false ->
                     Quoted = lists:join(<<"\r\n">>, [quoted_line(L) || L <- Lines]),
                     case iolist_size(Quoted) =< 2 * byte_size(Text) of
                         true -> {<<"quoted-printable">>, Quoted};
-                        false -> {<<"base64">>, base64_lines(base64:encode(Text))}
+                        false -> {<<"base64">>, crlf_base64(Lines)}
                     end
             end
     end.
+%% Base64 of text whose line breaks are CRLF, as RFC 2045 requires of text.
+crlf_base64(Lines) -> base64_lines(base64:encode(iolist_to_binary(lists:join(<<"\r\n">>, Lines)))).
 lone_carriage_return(Text) ->
     binary:match(Text, <<"\r">>) =/= nomatch andalso matches(Text, <<"\r(?!\n)">>).
 %% Text is safe as 7bit when every line is printable ASCII or tabs within 998
