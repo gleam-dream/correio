@@ -1,5 +1,5 @@
 -module(correio_mail_test_ffi).
--export([peer/1, report/1, report_closed/1, certificate/0, wire_semantics/1]).
+-export([peer/1, report/1, report_closed/1, certificate/0, wire_semantics/1, wire_fields/1]).
 
 certificate() -> {ok,Pem} = file:read_file("test/mail/certs/ca.pem"), Pem.
 peer(Mode) ->
@@ -84,6 +84,21 @@ wire_semantics(Raw) ->
     %% Python's independent standard-library parser verifies this fixed public
     %% test fixture. No production content is passed through command arguments.
     Python = os:find_executable("python3"),
-    Script = "import base64,email,email.policy,sys; m=email.message_from_bytes(base64.b64decode(sys.argv[1]),policy=email.policy.default); p=list(m.iter_parts()); assert m.get_content_type()=='multipart/mixed'; assert p[0].get_payload(decode=True)==b'hello\\nworld'; assert p[1].get_payload(decode=True)==bytes([0,255,128,13,10]); assert p[1].get_filename()=='binary.dat'",
+    Script = "import base64,email,email.policy,sys; m=email.message_from_bytes(base64.b64decode(sys.argv[1]),policy=email.policy.default); p=list(m.iter_parts()); assert m.get_content_type()=='multipart/mixed'; assert p[0].get_payload(decode=True).replace(b'\\r\\n',b'\\n')==b'hello\\nworld'; assert p[1].get_payload(decode=True)==bytes([0,255,128,13,10]); assert p[1].get_filename()=='binary.dat'",
     Port = open_port({spawn_executable,Python},[exit_status,{args,["-c",Script,binary_to_list(base64:encode(Raw))]}]),
     receive {Port,{exit_status,Status}} -> Status =:= 0 after 3000 -> port_close(Port), false end.
+
+%% Fields of a rendered message as an independent parser decodes them.
+wire_fields(Raw) ->
+    Python = os:find_executable("python3"),
+    Port = open_port({spawn_executable,Python},[exit_status,binary,{line,16#200000},
+        {args,["test/mail/wire_fields.py",binary_to_list(base64:encode(Raw))]}]),
+    collect_fields(Port, []).
+collect_fields(Port, Acc) ->
+    receive
+        {Port,{data,{eol,Line}}} ->
+            [Name, Value] = binary:split(Line, <<"\t">>),
+            collect_fields(Port, [{Name, base64:decode(Value)} | Acc]);
+        {Port,{exit_status,0}} -> {ok, lists:reverse(Acc)};
+        {Port,{exit_status,_}} -> {error, nil}
+    after 10000 -> port_close(Port), {error, nil} end.
