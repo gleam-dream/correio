@@ -148,7 +148,7 @@ For Postmark, add token redaction before starting the caller-owned HTTP client. 
 
 - `Accepted` means the provider accepted the submission; it does not confirm inbox delivery. `OutcomeUnknown` means submission may have occurred, so do not retry it automatically.
 - Captured messages can contain login links, codes, addresses, and blind recipients. Mount the mailbox only in development and put it behind application access control.
-- Memory storage is bounded and disappears on restart. The PostgreSQL adapter requires explicit migration and cleanup; the application owns the pool.
+- Memory storage is bounded and disappears on restart. A full memory store discards expired, unconsumed challenges to admit new ones and removes rows past retention on its own timer; rate-limit issuance in the application. The PostgreSQL adapter requires explicit migration and cleanup; the application owns the pool.
 - Keep a challenge operation's recovery handle when its outcome is unknown and resolve that operation through `recover_issue`, `recover_verify`, or `recover_revoke`.
 
 ## Development
