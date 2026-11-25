@@ -35,11 +35,13 @@ pub type InvalidCapacity {
 /// time. `expiries` covers rows that were never consumed, by `expires_at`;
 /// `retentions` covers every row, by `retain_until`. `incarnation` is created
 /// when the process starts, so a restarted store refuses every issue command
-/// stamped before its restart.
+/// stamped before its restart. `latest` is the latest time the store has
+/// observed; the store's time never goes below it.
 type State(a) {
   State(
     incarnation: String,
     clock: fn() -> Int,
+    latest: Int,
     rows: Dict(String, store.Row(a)),
     capacity: Int,
     expiries: Index,
@@ -83,7 +85,8 @@ pub fn new(
 }
 
 /// Replaces the millisecond clock. The store samples it inside serialized
-/// commands and its own cleanup, never before admission.
+/// commands and its own cleanup, never before admission. The store's time
+/// never goes below the latest value it has sampled.
 pub fn with_clock(config: Config(a), clock: fn() -> Int) -> Config(a) {
   Config(..config, clock:)
 }
@@ -110,6 +113,7 @@ pub fn supervised(config: Config(a)) -> ChildSpecification(store.Store(a)) {
       State(
         new_incarnation(),
         config.clock,
+        0,
         dict.new(),
         config.capacity,
         index_new(),
@@ -119,8 +123,9 @@ pub fn supervised(config: Config(a)) -> ChildSpecification(store.Store(a)) {
       config.name,
       state,
       fn(state: State(a)) {
+        let #(state, now) = observe(state)
         let #(state, removed) =
-          remove_past_retention(state, state.clock(), cleanup_batch, 0)
+          remove_past_retention(state, now, cleanup_batch, 0)
         #(state, removed == cleanup_batch)
       },
       config.cleanup_interval_ms,
@@ -136,12 +141,13 @@ pub fn store(name: Name(Message(a))) -> store.Store(a) {
   store.Store(
     now: fn() {
       call(name, fn(state: State(a)) {
-        #(state, store.Instant(state.clock(), state.incarnation))
+        let #(state, now) = observe(state)
+        #(state, store.Instant(now, state.incarnation))
       })
     },
     issue: fn(command) {
       call(name, fn(state: State(a)) {
-        let now = state.clock()
+        let #(state, now) = observe(state)
         case
           command.incarnation == state.incarnation,
           dict.get(state.rows, command.id)
@@ -177,7 +183,8 @@ pub fn store(name: Name(Message(a))) -> store.Store(a) {
         case dict.get(state.rows, command.id) {
           Error(_) -> #(state, Error(store.Missing))
           Ok(row) -> {
-            let #(next, reply) = store.verify_row(row, command, state.clock())
+            let #(state, now) = observe(state)
+            let #(next, reply) = store.verify_row(row, command, now)
             #(update(state, next), reply)
           }
         }
@@ -188,7 +195,8 @@ pub fn store(name: Name(Message(a))) -> store.Store(a) {
         case dict.get(state.rows, command.id) {
           Error(_) -> #(state, Error(store.Missing))
           Ok(row) -> {
-            let #(next, reply) = store.revoke_row(row, command, state.clock())
+            let #(state, now) = observe(state)
+            let #(next, reply) = store.revoke_row(row, command, now)
             #(update(state, next), reply)
           }
         }
@@ -199,11 +207,21 @@ pub fn store(name: Name(Message(a))) -> store.Store(a) {
         False -> Error(store.Capacity)
         True ->
           call(name, fn(state: State(a)) {
-            remove_past_retention(state, state.clock(), limit, 0)
+            let #(state, now) = observe(state)
+            remove_past_retention(state, now, limit, 0)
           })
       }
     },
   )
+}
+
+/// The store's time: the clock, but never below the latest time the store
+/// observed. Expiry the store has observed therefore stays observed after the
+/// clock moves backward, even once the expired row is discarded, while new
+/// challenges are still issued.
+fn observe(state: State(a)) -> #(State(a), Int) {
+  let now = int.max(state.clock(), state.latest)
+  #(State(..state, latest: now), now)
 }
 
 fn insert(state: State(a), row: store.Row(a)) -> State(a) {

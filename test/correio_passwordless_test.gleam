@@ -511,6 +511,55 @@ pub fn issue_recovery_cannot_recreate_a_challenge_after_restart_test() {
   stop(runtime)
 }
 
+/// The store's time never goes below the latest time it observed. An expired
+/// challenge that a full store discarded cannot be issued again after its
+/// clock moves backward, and new challenges are still issued.
+pub fn clock_rollback_cannot_revive_a_discarded_expired_challenge_test() {
+  let clock = clock_new(1000)
+  let assert Ok(runtime) = start_with_clock(1, fn() { clock_get(clock) })
+  let backing = runtime.store
+  let loss = clock_new(0)
+  let unreliable =
+    store.Store(..backing, issue: fn(command) {
+      let result = backing.issue(command)
+      case increment(loss) == 1 {
+        True -> Error(store.Unknown)
+        False -> result
+      }
+    })
+  let assert Ok(service) = auth.new(unreliable, "app", "login", key)
+  let assert Ok(service) = auth.with_policy(service, 10, 5, 20)
+  let assert Error(auth.IssueUnknown(recovery)) =
+    auth.issue(service, Account(1), email, auth.MagicLink)
+  let assert Ok(challenge) = auth.recover_issue(recovery)
+  clock_set(clock, 1015)
+  auth.verify(
+    service,
+    auth.challenge_id(challenge),
+    email,
+    auth.challenge_answer(challenge),
+  )
+  |> should.equal(Error(auth.Refused(store.Expired)))
+  // The full store discards the expired challenge to admit a short-lived one,
+  // and cleanup removes that one too.
+  let assert Ok(short) = auth.with_policy(service, 1, 5, 1)
+  let assert Ok(_) = auth.issue(short, Account(2), email, auth.MagicLink)
+  clock_set(clock, 1020)
+  backing.cleanup(10) |> should.equal(Ok(1))
+  clock_set(clock, 1005)
+  auth.recover_issue(recovery)
+  |> should.equal(Error(auth.IssueFailed(store.IssueExpired)))
+  auth.verify(
+    service,
+    auth.challenge_id(challenge),
+    email,
+    auth.challenge_answer(challenge),
+  )
+  |> should.equal(Error(auth.Refused(store.Missing)))
+  let assert Ok(_) = auth.issue(service, Account(3), email, auth.MagicLink)
+  stop(runtime)
+}
+
 pub fn store_failure_leaves_its_callers_running_test() {
   let assert Ok(runtime) =
     start_configured(10, fn(config) {
