@@ -4,6 +4,7 @@ import correio/message
 import correio/smtp
 import gleam/bit_array
 import gleam/list
+import gleam/option
 import gleam/result
 import gleam/string
 import gleeunit/should
@@ -50,6 +51,18 @@ pub fn smtp_acceptance_includes_private_envelope_recipient_test() {
   |> should.be_true
   let assert Ok(raw) = bit_array.to_string(raw)
   string.contains(raw, "private@example.com") |> should.be_false
+}
+
+/// The receipt carries the Message-ID the peer received, so a later bounce or
+/// reply can be matched to this send.
+pub fn smtp_receipt_returns_the_transmitted_message_id_test() {
+  let #(port, peer) = peer(Accepting)
+  let assert Ok(config) = smtp.local_test("127.0.0.1", port)
+  let assert delivery.Accepted(receipt) = smtp.send(config, mail())
+  let assert option.Some(id) = receipt.message_id
+  let #(_, raw) = report(peer)
+  let assert Ok(raw) = bit_array.to_string(raw)
+  string.contains(raw, "\r\nMessage-ID: " <> id <> "\r\n") |> should.be_true
 }
 
 pub fn partial_recipient_refusal_aborts_before_data_test() {

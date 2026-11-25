@@ -28,18 +28,20 @@ valid_content_type(Value) -> byte_size(Value) =< 127 andalso
 valid_content_id(Value) -> byte_size(Value) > 0 andalso byte_size(Value) =< 254 andalso matches(Value, <<"\\A[A-Za-z0-9][A-Za-z0-9@._+-]*\\z">>).
 matches(Value, Pattern) -> re:run(Value, Pattern, [{capture, none}]) =:= match.
 
+%% Returns the message bytes and the Message-ID written into them.
 encode(From, To, Cc, Subject, Body, ReplyTo, Headers, Attachments) ->
     try
+        MessageId = <<"<", (unique())/binary, "@correio.invalid>">>,
         Base = [{<<"From">>, mailbox(From)}, {<<"To">>, mailboxes(To)}]
             ++ optional_header(<<"Cc">>, Cc)
             ++ case ReplyTo of none -> []; {some, A} -> [{<<"Reply-To">>, mailbox(A)}] end
             ++ [{<<"Subject">>, encoded_words(Subject)}, {<<"MIME-Version">>, <<"1.0">>},
-                {<<"Date">>, mail_date()}, {<<"Message-ID">>, [<<"<">>, unique(), <<"@correio.invalid>">>]}]
+                {<<"Date">>, mail_date()}, {<<"Message-ID">>, MessageId}]
             ++ Headers,
         {Inline, Files} = lists:partition(fun({_,_,_,D}) -> element_or_atom(D) =:= inline end, Attachments),
         Content = body_with_inline(Body, Inline),
         Mixed = case Attachments of [] -> Content; _ -> multipart(<<"mixed">>, [Content | [attachment(A) || A <- Files]]) end,
-        {ok, iolist_to_binary([headers(Base), Mixed])}
+        {ok, {iolist_to_binary([headers(Base), Mixed]), MessageId}}
     catch _:_ -> {error, encoding_failed} end.
 
 element_or_atom(T) when is_tuple(T) -> element(1,T);

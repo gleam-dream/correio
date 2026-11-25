@@ -109,7 +109,8 @@ fn render(data: Dynamic) -> #(String, json.Json) {
         message.attach(mail, attachment)
       },
     )
-  let assert Ok(raw) = mime.render(mail)
+  let assert Ok(rendered) = mime.render(mail)
+  let raw = rendered.bytes
   let #(sender, recipients) = message.envelope(mail)
   #(
     id,

@@ -7,8 +7,16 @@ import gleam/option.{type Option}
 pub type Sender =
   fn(Message) -> Outcome
 
+/// `message_id` is the Message-ID header value the provider received, angle
+/// brackets included, when Correio wrote the header; match later bounces and
+/// replies against it. `provider_id` is the provider's own identifier for the
+/// submission, when it returns one.
 pub type Receipt {
-  Receipt(provider_id: Option(String), recipients: List(Address))
+  Receipt(
+    message_id: Option(String),
+    provider_id: Option(String),
+    recipients: List(Address),
+  )
 }
 
 pub type Rejection {
