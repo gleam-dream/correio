@@ -1,5 +1,5 @@
-//// Bounded local challenge store, owned by and linked to the process that
-//// starts it. Restart loses all rows.
+//// Bounded local challenge store that runs as a child of the application's
+//// supervisor. Restart loses all rows.
 ////
 //// The store process removes rows past retention on its own timer, so an
 //// application need not schedule `cleanup`. Capacity still bounds retained
@@ -7,25 +7,36 @@
 
 import correio/passwordless/store
 import gleam/dict.{type Dict}
+import gleam/erlang/process.{type Name, type Pid}
 import gleam/int
+import gleam/otp/actor
+import gleam/otp/supervision.{type ChildSpecification}
 import gleam/result
 
-pub opaque type Runtime(a) {
-  Runtime(process: Process(State(a)), clock: fn() -> Int)
+/// The messages of a store process. Only this module sends them; the type
+/// tags the process name that `supervised` registers and `store` reaches.
+pub type Message(a)
+
+/// A store configuration whose capacity has been checked.
+pub opaque type Config(a) {
+  Config(
+    name: Name(Message(a)),
+    capacity: Int,
+    clock: fn() -> Int,
+    cleanup_interval_ms: Int,
+  )
 }
 
-pub type StartError {
+pub type InvalidCapacity {
   InvalidCapacity
-  StartFailed
 }
-
-pub type Process(state)
 
 /// Each index holds one `#(time, id)` entry per row it covers, ordered by
 /// time. `expiries` covers rows that were never consumed, by `expires_at`;
 /// `retentions` covers every row, by `retain_until`.
 type State(a) {
   State(
+    clock: fn() -> Int,
     rows: Dict(String, store.Row(a)),
     capacity: Int,
     expiries: Index,
@@ -41,7 +52,8 @@ const default_cleanup_interval_ms = 60_000
 /// commands run.
 const cleanup_batch = 1000
 
-/// Capacity is the total retained row count, at most one million.
+/// A store registered under `name` that retains at most `capacity` rows, at
+/// most one million.
 ///
 /// A row holds its slot until its retention ends. A full store admits a new
 /// challenge by discarding one row past retention or, failing that, the
@@ -49,54 +61,71 @@ const cleanup_batch = 1000
 /// keeps its slot for its whole retention. The store also removes rows past
 /// retention on its own timer, once a minute.
 ///
-/// The calling process owns the store. The store stops when its owner exits,
-/// and every later command then returns `Unavailable`, so start it from a
-/// process that lives as long as the application needs the store, such as a
-/// supervised process, never from a request handler. The store is linked to
-/// its owner: if the store fails, the owner receives its exit signal and
-/// stops unless it traps exits, so the owner's supervisor restarts both.
-pub fn start(capacity: Int) -> Result(Runtime(a), StartError) {
-  start_with_clock(capacity, system_milliseconds)
-}
-
-/// Test clock is sampled inside serialized commands, never before admission.
-pub fn start_with_clock(
+/// Create the name once at application start, never from request input, and
+/// pass it to both `supervised` and `store`.
+pub fn new(
+  name: Name(Message(a)),
   capacity: Int,
-  clock: fn() -> Int,
-) -> Result(Runtime(a), StartError) {
-  start_with_cleanup_interval(capacity, clock, default_cleanup_interval_ms)
-}
-
-/// As `start_with_clock`, with the period of the store's own removal of rows
-/// past retention. The period is clamped to 1 millisecond through 1 day.
-pub fn start_with_cleanup_interval(
-  capacity: Int,
-  clock: fn() -> Int,
-  interval_ms: Int,
-) -> Result(Runtime(a), StartError) {
+) -> Result(Config(a), InvalidCapacity) {
   case capacity > 0 && capacity <= 1_000_000 {
-    False -> Error(InvalidCapacity)
     True ->
-      start_process(
-        State(dict.new(), capacity, index_new(), index_new()),
-        fn(state) {
-          let #(state, removed) =
-            remove_past_retention(state, clock(), cleanup_batch, 0)
-          #(state, removed == cleanup_batch)
-        },
-        int.clamp(interval_ms, 1, 86_400_000),
-      )
-      |> result.map(fn(process) { Runtime(process, clock) })
-      |> result.map_error(fn(_) { StartFailed })
+      Ok(Config(
+        name,
+        capacity,
+        system_milliseconds,
+        default_cleanup_interval_ms,
+      ))
+    False -> Error(InvalidCapacity)
   }
 }
 
-pub fn store(runtime: Runtime(a)) -> store.Store(a) {
+/// Replaces the millisecond clock. The store samples it inside serialized
+/// commands and its own cleanup, never before admission.
+pub fn with_clock(config: Config(a), clock: fn() -> Int) -> Config(a) {
+  Config(..config, clock:)
+}
+
+/// Sets the period of the store's own removal of rows past retention. The
+/// period is clamped to 1 millisecond through 1 day.
+pub fn with_cleanup_interval(config: Config(a), interval_ms: Int) -> Config(a) {
+  Config(..config, cleanup_interval_ms: int.clamp(interval_ms, 1, 86_400_000))
+}
+
+/// The store as a child of the application's supervisor, registered under the
+/// configured name. The supervisor owns its lifetime: the store is linked to
+/// the supervisor and to no other process, so it outlives the process that
+/// built the configuration and stops only with its supervisor. A store that
+/// fails is restarted empty under the same name, and every `store.Store` built
+/// with `store` reaches the replacement. A command in progress when the store
+/// fails returns `Unknown`; a command sent while no store is registered
+/// returns `Unavailable`.
+pub fn supervised(config: Config(a)) -> ChildSpecification(store.Store(a)) {
+  supervision.worker(fn() {
+    let state =
+      State(config.clock, dict.new(), config.capacity, index_new(), index_new())
+    start_process(
+      config.name,
+      state,
+      fn(state: State(a)) {
+        let #(state, removed) =
+          remove_past_retention(state, state.clock(), cleanup_batch, 0)
+        #(state, removed == cleanup_batch)
+      },
+      config.cleanup_interval_ms,
+    )
+    |> result.map(fn(pid) { actor.Started(pid, store(config.name)) })
+    |> result.map_error(actor.InitExited)
+  })
+}
+
+/// The store registered under `name`. Each command reaches whichever process
+/// holds the name when the command is sent.
+pub fn store(name: Name(Message(a))) -> store.Store(a) {
   store.Store(
-    now: fn() { call(runtime.process, fn(state) { #(state, runtime.clock()) }) },
+    now: fn() { call(name, fn(state: State(a)) { #(state, state.clock()) }) },
     issue: fn(command) {
-      call(runtime.process, fn(state) {
-        let now = runtime.clock()
+      call(name, fn(state: State(a)) {
+        let now = state.clock()
         case dict.get(state.rows, command.id) {
           Ok(row) ->
             case store.same_issue(row, command), now < row.retain_until {
@@ -123,22 +152,22 @@ pub fn store(runtime: Runtime(a)) -> store.Store(a) {
       |> result.flatten
     },
     verify: fn(command) {
-      call(runtime.process, fn(state) {
+      call(name, fn(state: State(a)) {
         case dict.get(state.rows, command.id) {
           Error(_) -> #(state, Error(store.Missing))
           Ok(row) -> {
-            let #(next, reply) = store.verify_row(row, command, runtime.clock())
+            let #(next, reply) = store.verify_row(row, command, state.clock())
             #(update(state, next), reply)
           }
         }
       })
     },
     revoke: fn(command) {
-      call(runtime.process, fn(state) {
+      call(name, fn(state: State(a)) {
         case dict.get(state.rows, command.id) {
           Error(_) -> #(state, Error(store.Missing))
           Ok(row) -> {
-            let #(next, reply) = store.revoke_row(row, command, runtime.clock())
+            let #(next, reply) = store.revoke_row(row, command, state.clock())
             #(update(state, next), reply)
           }
         }
@@ -148,8 +177,8 @@ pub fn store(runtime: Runtime(a)) -> store.Store(a) {
       case limit > 0 && limit <= 1000 {
         False -> Error(store.Capacity)
         True ->
-          call(runtime.process, fn(state) {
-            remove_past_retention(state, runtime.clock(), limit, 0)
+          call(name, fn(state: State(a)) {
+            remove_past_retention(state, state.clock(), limit, 0)
           })
       }
     },
@@ -221,26 +250,19 @@ fn make_room(state: State(a), now: Int) -> State(a) {
   }
 }
 
-/// Returns only after the process has stopped. Unknown does not prove completion.
-pub fn stop(runtime: Runtime(a)) -> Result(Nil, store.Fault) {
-  stop_process(runtime.process)
-}
-
 @external(erlang, "correio_auth_memory_ffi", "start")
 fn start_process(
+  name: Name(Message(a)),
   state: state,
   cleanup: fn(state) -> #(state, Bool),
   interval_ms: Int,
-) -> Result(Process(state), Nil)
+) -> Result(Pid, process.ExitReason)
 
 @external(erlang, "correio_auth_memory_ffi", "call")
 fn call(
-  process: Process(state),
-  function: fn(state) -> #(state, reply),
+  name: Name(Message(a)),
+  function: fn(State(a)) -> #(State(a), reply),
 ) -> Result(reply, store.Fault)
-
-@external(erlang, "correio_auth_memory_ffi", "stop")
-fn stop_process(process: Process(state)) -> Result(Nil, store.Fault)
 
 @external(erlang, "correio_auth_memory_ffi", "system_milliseconds")
 fn system_milliseconds() -> Int

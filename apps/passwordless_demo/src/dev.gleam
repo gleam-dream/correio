@@ -4,12 +4,18 @@ import correio/passwordless
 import correio/passwordless/memory
 import gleam/erlang/process
 import gleam/io
+import gleam/otp/static_supervisor as supervisor
 import passwordless_demo
 
 pub fn main() {
-  let assert Ok(runtime) = memory.start(1000)
+  let challenges = process.new_name("local_demo_challenges")
+  let assert Ok(config) = memory.new(challenges, 1000)
+  let assert Ok(_) =
+    supervisor.new(supervisor.OneForOne)
+    |> supervisor.add(memory.supervised(config))
+    |> supervisor.start
   let assert Ok(service) =
-    passwordless.new(memory.store(runtime), "local-demo", "login", <<
+    passwordless.new(memory.store(challenges), "local-demo", "login", <<
       "local-development-key-not-for-production":utf8,
     >>)
   let assert Ok(app) = passwordless_demo.start_with_mailbox(service)

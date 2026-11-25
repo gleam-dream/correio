@@ -1,5 +1,5 @@
 -module(correio_auth_test_ffi).
--export([clock_sample/1, await_sample/1, owner_exit/1, owned_by_finished_process/1]).
+-export([clock_sample/1, await_sample/1, stop_supervisor/1, await_restart/2]).
 -export([clock_new/1, clock_get/1, clock_set/2, increment/1, parallel/2]).
 clock_new(N) -> R = atomics:new(1, [{signed, true}]), atomics:put(R, 1, N), {R, self()}.
 clock_get({R, _}) -> atomics:get(R, 1).
@@ -14,20 +14,19 @@ parallel(Count, Function) ->
   [P ! {start, Ref} || P <- Workers],
   [receive {Ref, Reply} -> Reply after 10000 -> error(worker_timeout) end || _ <- Workers].
 
-%% Runs Body in a new process that then waits forever, and reports whether an
-%% exit signal from a process it started ended it.
-owner_exit(Body) ->
-    {Pid, Monitor} = spawn_monitor(fun() -> Body(), receive after infinity -> ok end end),
-    receive
-        {'DOWN', Monitor, process, Pid, normal} -> {error, nil};
-        {'DOWN', Monitor, process, Pid, _} -> {ok, stopped_by_store}
-    after 2000 -> exit(Pid, kill), {error, nil} end.
-%% Runs Body in a process that exits normally, and returns its value after
-%% that process and every process monitoring it have observed the exit.
-owned_by_finished_process(Body) ->
-    Parent = self(),
-    {Pid, Monitor} = spawn_monitor(fun() -> Parent ! {self(), Body()} end),
-    receive {Pid, Value} ->
-        receive {'DOWN', Monitor, process, Pid, _} -> ok end,
-        {ok, Value}
-    after 2000 -> exit(Pid, kill), {error, nil} end.
+%% Stops a supervisor started by this process and waits until it is down.
+stop_supervisor(Pid) ->
+    unlink(Pid),
+    Monitor = monitor(process, Pid),
+    exit(Pid, shutdown),
+    receive {'DOWN', Monitor, process, Pid, _} -> nil after 5000 -> error(supervisor_stop_timeout) end.
+%% Waits until a process other than Failed is registered under Name. The
+%% supervisor restarts the store after it observes the failure, which this
+%% process cannot synchronize with, so this polls for at most two seconds.
+await_restart(Name, Failed) -> await_restart(Name, Failed, 2000).
+await_restart(_, _, 0) -> {error, nil};
+await_restart(Name, Failed, Left) ->
+    case whereis(Name) of
+        Pid when is_pid(Pid), Pid =/= Failed -> {ok, Pid};
+        _ -> receive after 1 -> await_restart(Name, Failed, Left - 1) end
+    end.

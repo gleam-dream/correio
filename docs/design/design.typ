@@ -8,7 +8,7 @@
     #no-goal(title: "Operate an inbound mailbox or identity provider")[IMAP, POP, inbound mail processing, OAuth authorization-server behavior, WebAuthn, and authenticator TOTP are outside this package's contract.]
     #invariant(title: "Ordinary diagnostics exclude secrets", enforcement: "mechanism")[Descriptions and observations exclude provider credentials, challenge answers, message bodies, arbitrary application subjects, and raw foreign errors. Explicit delivery and VM inspection are outside that boundary.]
     #invariant(title: "Delivery and verification share no authority", enforcement: "convention")[Verification never sends email and delivery never consumes a challenge. Neither context imports the other, and no shared transaction spans them.]
-    #principle(title: "Keep ownership visible")[Constructors validate without starting processes. Runtime handles have explicit start and stop boundaries; injected pools and stores remain caller-owned.]
+    #principle(title: "Keep ownership visible")[Constructors validate without starting processes. A long-lived process, such as the memory store, starts only as a child of the application's supervisor; a short-lived handle, such as a capture, has explicit start and stop boundaries. Injected pools and stores remain caller-owned.]
     #principle(title: "Preserve application-native values")[Typed subjects and provider extensions compose through public contracts without importing implementation modules.]
   ])
 
