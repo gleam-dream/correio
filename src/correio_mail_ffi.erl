@@ -1,6 +1,41 @@
 -module(correio_mail_ffi).
 -export([parse_mailbox/1, safe_header/1, valid_header_name/1, valid_custom_header/2, valid_content_type/1, valid_content_id/1, encode/8]).
 
+%% The quoted-printable escape of each byte value, indexed by value + 1.
+-define(ESCAPED, {
+    <<"=00">>, <<"=01">>, <<"=02">>, <<"=03">>, <<"=04">>, <<"=05">>, <<"=06">>, <<"=07">>,
+    <<"=08">>, <<"=09">>, <<"=0A">>, <<"=0B">>, <<"=0C">>, <<"=0D">>, <<"=0E">>, <<"=0F">>,
+    <<"=10">>, <<"=11">>, <<"=12">>, <<"=13">>, <<"=14">>, <<"=15">>, <<"=16">>, <<"=17">>,
+    <<"=18">>, <<"=19">>, <<"=1A">>, <<"=1B">>, <<"=1C">>, <<"=1D">>, <<"=1E">>, <<"=1F">>,
+    <<"=20">>, <<"=21">>, <<"=22">>, <<"=23">>, <<"=24">>, <<"=25">>, <<"=26">>, <<"=27">>,
+    <<"=28">>, <<"=29">>, <<"=2A">>, <<"=2B">>, <<"=2C">>, <<"=2D">>, <<"=2E">>, <<"=2F">>,
+    <<"=30">>, <<"=31">>, <<"=32">>, <<"=33">>, <<"=34">>, <<"=35">>, <<"=36">>, <<"=37">>,
+    <<"=38">>, <<"=39">>, <<"=3A">>, <<"=3B">>, <<"=3C">>, <<"=3D">>, <<"=3E">>, <<"=3F">>,
+    <<"=40">>, <<"=41">>, <<"=42">>, <<"=43">>, <<"=44">>, <<"=45">>, <<"=46">>, <<"=47">>,
+    <<"=48">>, <<"=49">>, <<"=4A">>, <<"=4B">>, <<"=4C">>, <<"=4D">>, <<"=4E">>, <<"=4F">>,
+    <<"=50">>, <<"=51">>, <<"=52">>, <<"=53">>, <<"=54">>, <<"=55">>, <<"=56">>, <<"=57">>,
+    <<"=58">>, <<"=59">>, <<"=5A">>, <<"=5B">>, <<"=5C">>, <<"=5D">>, <<"=5E">>, <<"=5F">>,
+    <<"=60">>, <<"=61">>, <<"=62">>, <<"=63">>, <<"=64">>, <<"=65">>, <<"=66">>, <<"=67">>,
+    <<"=68">>, <<"=69">>, <<"=6A">>, <<"=6B">>, <<"=6C">>, <<"=6D">>, <<"=6E">>, <<"=6F">>,
+    <<"=70">>, <<"=71">>, <<"=72">>, <<"=73">>, <<"=74">>, <<"=75">>, <<"=76">>, <<"=77">>,
+    <<"=78">>, <<"=79">>, <<"=7A">>, <<"=7B">>, <<"=7C">>, <<"=7D">>, <<"=7E">>, <<"=7F">>,
+    <<"=80">>, <<"=81">>, <<"=82">>, <<"=83">>, <<"=84">>, <<"=85">>, <<"=86">>, <<"=87">>,
+    <<"=88">>, <<"=89">>, <<"=8A">>, <<"=8B">>, <<"=8C">>, <<"=8D">>, <<"=8E">>, <<"=8F">>,
+    <<"=90">>, <<"=91">>, <<"=92">>, <<"=93">>, <<"=94">>, <<"=95">>, <<"=96">>, <<"=97">>,
+    <<"=98">>, <<"=99">>, <<"=9A">>, <<"=9B">>, <<"=9C">>, <<"=9D">>, <<"=9E">>, <<"=9F">>,
+    <<"=A0">>, <<"=A1">>, <<"=A2">>, <<"=A3">>, <<"=A4">>, <<"=A5">>, <<"=A6">>, <<"=A7">>,
+    <<"=A8">>, <<"=A9">>, <<"=AA">>, <<"=AB">>, <<"=AC">>, <<"=AD">>, <<"=AE">>, <<"=AF">>,
+    <<"=B0">>, <<"=B1">>, <<"=B2">>, <<"=B3">>, <<"=B4">>, <<"=B5">>, <<"=B6">>, <<"=B7">>,
+    <<"=B8">>, <<"=B9">>, <<"=BA">>, <<"=BB">>, <<"=BC">>, <<"=BD">>, <<"=BE">>, <<"=BF">>,
+    <<"=C0">>, <<"=C1">>, <<"=C2">>, <<"=C3">>, <<"=C4">>, <<"=C5">>, <<"=C6">>, <<"=C7">>,
+    <<"=C8">>, <<"=C9">>, <<"=CA">>, <<"=CB">>, <<"=CC">>, <<"=CD">>, <<"=CE">>, <<"=CF">>,
+    <<"=D0">>, <<"=D1">>, <<"=D2">>, <<"=D3">>, <<"=D4">>, <<"=D5">>, <<"=D6">>, <<"=D7">>,
+    <<"=D8">>, <<"=D9">>, <<"=DA">>, <<"=DB">>, <<"=DC">>, <<"=DD">>, <<"=DE">>, <<"=DF">>,
+    <<"=E0">>, <<"=E1">>, <<"=E2">>, <<"=E3">>, <<"=E4">>, <<"=E5">>, <<"=E6">>, <<"=E7">>,
+    <<"=E8">>, <<"=E9">>, <<"=EA">>, <<"=EB">>, <<"=EC">>, <<"=ED">>, <<"=EE">>, <<"=EF">>,
+    <<"=F0">>, <<"=F1">>, <<"=F2">>, <<"=F3">>, <<"=F4">>, <<"=F5">>, <<"=F6">>, <<"=F7">>,
+    <<"=F8">>, <<"=F9">>, <<"=FA">>, <<"=FB">>, <<"=FC">>, <<"=FD">>, <<"=FE">>, <<"=FF">>}).
+
 parse_mailbox(Value) when byte_size(Value) =< 254 ->
     case binary:split(Value, <<"@">>, [global]) of
         [Local, Domain] when byte_size(Local) > 0, byte_size(Local) =< 64, byte_size(Domain) > 0 ->
@@ -112,48 +147,81 @@ body_with_inline(Body, Inline) -> multipart(<<"related">>, [body(Body) | [attach
 %% Text line breaks (CRLF or LF) are emitted as CRLF. Text is emitted as 7bit
 %% when transports carry it unchanged. Other text is quoted-printable when that
 %% is at most twice the text, which holds for mostly ASCII text and keeps the
-%% part inside the size bound checked before encoding, and base64 otherwise. Text with a carriage return outside CRLF is
-%% base64, which preserves it exactly. No line break follows the content, so
-%% the part decodes to the text itself.
+%% part inside the size bound checked before encoding, and base64 otherwise.
+%% Text with a carriage return outside CRLF is base64, which preserves it
+%% exactly. No line break follows the content, so the part decodes to the text
+%% itself. Each check reads the whole text once and the output is iodata of
+%% sub-binaries or one binary per line, never a term per byte.
 text_leaf(Type, Text) ->
     Lines = binary:split(Text, [<<"\r\n">>, <<"\n">>], [global]),
     {Encoding, Content} =
-        case {lists:any(fun(L) -> binary:match(L, <<"\r">>) =/= nomatch end, Lines),
-              lists:all(fun seven_bit_line/1, Lines)} of
-            {true, _} -> {<<"base64">>, base64_lines(base64:encode(Text))};
-            {false, true} -> {<<"7bit">>, lists:join(<<"\r\n">>, Lines)};
-            {false, false} ->
-                %% Each byte outside ASCII triples, so text that is more than
-                %% half such bytes cannot fit and is not encoded twice.
-                Quoted = case 2 * length([C || <<C>> <= Text, C >= 128]) > byte_size(Text) of
-                    true -> too_large;
-                    false -> iolist_to_binary(lists:join(<<"\r\n">>, [quoted_line(L) || L <- Lines]))
-                end,
-                case is_binary(Quoted) andalso byte_size(Quoted) =< 2 * byte_size(Text) of
-                    true -> {<<"quoted-printable">>, Quoted};
-                    false -> {<<"base64">>, base64_lines(base64:encode(Text))}
-                end
+        case lone_carriage_return(Text) of
+            true -> {<<"base64">>, base64_lines(base64:encode(Text))};
+            false -> text_encoding(Text, Lines)
         end,
     [headers([{<<"Content-Type">>, Type}, {<<"Content-Transfer-Encoding">>, Encoding}]), <<"\r\n">>, Content].
-%% A line is safe as 7bit when it is printable ASCII or tabs within 998 bytes,
-%% has no trailing white space a relay could strip, and does not start with
-%% "From ", which mailbox storage rewrites.
-seven_bit_line(Line) ->
-    byte_size(Line) =< 998
-        andalso matches(Line, <<"\\A(?!From )(?:[\\t\\x20-\\x7e]*[\\x21-\\x7e])?\\z">>).
+text_encoding(Text, Lines) ->
+    case seven_bit(Text, Lines) of
+        true -> {<<"7bit">>, lists:join(<<"\r\n">>, Lines)};
+        %% Each byte outside ASCII triples, so text that is more than half
+        %% such bytes cannot fit and is not encoded twice.
+        false ->
+            case 2 * high_bytes(Text, 0) > byte_size(Text) of
+                true -> {<<"base64">>, base64_lines(base64:encode(Text))};
+                false ->
+                    Quoted = lists:join(<<"\r\n">>, [quoted_line(L) || L <- Lines]),
+                    case iolist_size(Quoted) =< 2 * byte_size(Text) of
+                        true -> {<<"quoted-printable">>, Quoted};
+                        false -> {<<"base64">>, base64_lines(base64:encode(Text))}
+                    end
+            end
+    end.
+lone_carriage_return(Text) ->
+    binary:match(Text, <<"\r">>) =/= nomatch andalso matches(Text, <<"\r(?!\n)">>).
+%% Text is safe as 7bit when every line is printable ASCII or tabs within 998
+%% bytes, has no trailing white space a relay could strip, and does not start
+%% with "From ", which mailbox storage rewrites. The caller has excluded a
+%% carriage return outside CRLF.
+seven_bit(Text, Lines) ->
+    lists:all(fun(L) -> byte_size(L) =< 998 end, Lines)
+        andalso not matches(Text, <<"[^\\t\\r\\n\\x20-\\x7e]">>)
+        andalso binary:match(Text, [<<" \n">>, <<"\t\n">>, <<" \r\n">>, <<"\t\r\n">>]) =:= nomatch
+        andalso not lists:member(binary:last(Text), [$\s, $\t])
+        andalso binary:match(Text, <<"\nFrom ">>) =:= nomatch
+        andalso binary:longest_common_prefix([Text, <<"From ">>]) < 5.
+%% Counts bytes at or above 128, four bytes per step: the high bits of a word
+%% are moved to the low bit of each byte and summed by one multiplication.
+high_bytes(<<Word:32, Rest/binary>>, N) ->
+    Bits = (Word band 16#80808080) bsr 7,
+    high_bytes(Rest, N + (((Bits * 16#01010101) bsr 24) band 255));
+high_bytes(<<C, Rest/binary>>, N) -> high_bytes(Rest, N + (C bsr 7));
+high_bytes(<<>>, N) -> N.
 %% RFC 2045 quoted-printable with soft breaks so no encoded line exceeds 76.
-quoted_line(Line) -> soft_breaks(quoted_tokens(Line, start), 0).
-quoted_tokens(<<>>, _) -> [];
-quoted_tokens(<<"From ", Rest/binary>>, start) -> [<<"=46">> | quoted_tokens(<<"rom ", Rest/binary>>, middle)];
-quoted_tokens(<<C>>, _) when C =:= $\s; C =:= $\t -> [escape(C)];
-quoted_tokens(<<C, Rest/binary>>, _) when C =:= $\s; C =:= $\t; C >= 33, C =< 126, C =/= $= -> [<<C>> | quoted_tokens(Rest, middle)];
-quoted_tokens(<<C, Rest/binary>>, _) -> [escape(C) | quoted_tokens(Rest, middle)].
-escape(C) -> <<$=, (hex(C bsr 4)), (hex(C band 15))>>.
-hex(N) when N < 10 -> $0 + N;
-hex(N) -> $A + N - 10.
-soft_breaks([], _) -> [];
-soft_breaks([Token | Rest], Used) when Used + byte_size(Token) > 75 -> [<<"=\r\n">>, Token | soft_breaks(Rest, byte_size(Token))];
-soft_breaks([Token | Rest], Used) -> [Token | soft_breaks(Rest, Used + byte_size(Token))].
+%% Runs of literal bytes are emitted as parts of the line, not byte by byte.
+quoted_line(<<"F", Rest/binary>> = Line) when binary_part(Line, 0, min(5, byte_size(Line))) =:= <<"From ">> ->
+    quoted(Rest, Rest, 0, 0, 3, [<<"=46">>]);
+quoted_line(Line) -> quoted(Line, Line, 0, 0, 0, []).
+%% Pos is the offset of the next byte in Line, Start the offset of the pending
+%% literal run, and Used the length of the current encoded line.
+quoted(<<>>, Line, Pos, Start, _, Acc) ->
+    lists:reverse(run(Line, Start, Pos, Acc));
+quoted(<<C>>, Line, Pos, Start, Used, Acc) when C =:= $\s; C =:= $\t ->
+    {_, Acc1} = escaped(C, Line, Pos, Start, Used, Acc),
+    lists:reverse(Acc1);
+quoted(<<C, Rest/binary>>, Line, Pos, Start, Used, Acc) when C >= 33, C =< 126, C =/= $=; C =:= $\s; C =:= $\t ->
+    case Used >= 75 of
+        true -> quoted(Rest, Line, Pos + 1, Pos, 1, [<<"=\r\n">> | run(Line, Start, Pos, Acc)]);
+        false -> quoted(Rest, Line, Pos + 1, Start, Used + 1, Acc)
+    end;
+quoted(<<C, Rest/binary>>, Line, Pos, Start, Used, Acc) ->
+    {Used1, Acc1} = escaped(C, Line, Pos, Start, Used, Acc),
+    quoted(Rest, Line, Pos + 1, Pos + 1, Used1, Acc1).
+escaped(C, Line, Pos, Start, Used, Acc) when Used + 3 > 75 ->
+    {3, [element(C + 1, ?ESCAPED), <<"=\r\n">> | run(Line, Start, Pos, Acc)]};
+escaped(C, Line, Pos, Start, Used, Acc) ->
+    {Used + 3, [element(C + 1, ?ESCAPED) | run(Line, Start, Pos, Acc)]}.
+run(_, Start, Start, Acc) -> Acc;
+run(Line, Start, Pos, Acc) -> [binary_part(Line, Start, Pos - Start) | Acc].
 leaf(Type, Extra, Bytes) -> [headers([{<<"Content-Type">>, Type}, {<<"Content-Transfer-Encoding">>, <<"base64">>}] ++ Extra), <<"\r\n">>, base64_lines(base64:encode(Bytes)), <<"\r\n">>].
 base64_lines(<<Chunk:76/binary, Rest/binary>>) -> [Chunk, <<"\r\n">>, base64_lines(Rest)];
 base64_lines(Rest) -> Rest.
