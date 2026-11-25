@@ -1,4 +1,5 @@
-//// Bounded, explicitly owned local challenge store. Restart loses all rows.
+//// Bounded local challenge store, owned by and linked to the process that
+//// starts it. Restart loses all rows.
 ////
 //// The store process removes rows past retention on its own timer, so an
 //// application need not schedule `cleanup`. Capacity still bounds retained
@@ -47,6 +48,13 @@ const cleanup_batch = 1000
 /// longest-expired challenge that was never consumed. A consumption receipt
 /// keeps its slot for its whole retention. The store also removes rows past
 /// retention on its own timer, once a minute.
+///
+/// The calling process owns the store. The store stops when its owner exits,
+/// and every later command then returns `Unavailable`, so start it from a
+/// process that lives as long as the application needs the store, such as a
+/// supervised process, never from a request handler. The store is linked to
+/// its owner: if the store fails, the owner receives its exit signal and
+/// stops unless it traps exits, so the owner's supervisor restarts both.
 pub fn start(capacity: Int) -> Result(Runtime(a), StartError) {
   start_with_clock(capacity, system_milliseconds)
 }

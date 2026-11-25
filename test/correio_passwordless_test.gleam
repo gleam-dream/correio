@@ -442,3 +442,33 @@ fn clock_sample(clock: Clock) -> Int
 
 @external(erlang, "correio_auth_test_ffi", "await_sample")
 fn await_sample(value: Int) -> Result(Nil, Nil)
+
+pub fn store_failure_stops_its_owner_test() {
+  // The owner starts a store whose clock crashes, runs one command, and then
+  // waits forever. Only the store's exit signal can end it.
+  owner_exit(fn() {
+    let assert Ok(runtime) = memory.start_with_clock(1, fn() { panic })
+    let _ = memory.store(runtime).now()
+    Nil
+  })
+  |> should.equal(Ok(StoppedByStore))
+}
+
+pub fn store_stops_when_its_owner_exits_test() {
+  let assert Ok(backing) =
+    owned_by_finished_process(fn() {
+      let assert Ok(runtime) = memory.start(1)
+      memory.store(runtime)
+    })
+  backing.now() |> should.equal(Error(store.Unavailable))
+}
+
+pub type OwnerExit {
+  StoppedByStore
+}
+
+@external(erlang, "correio_auth_test_ffi", "owner_exit")
+fn owner_exit(body: fn() -> Nil) -> Result(OwnerExit, Nil)
+
+@external(erlang, "correio_auth_test_ffi", "owned_by_finished_process")
+fn owned_by_finished_process(body: fn() -> a) -> Result(a, Nil)

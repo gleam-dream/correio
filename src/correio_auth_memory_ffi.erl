@@ -5,8 +5,11 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
 %% Cleanup runs inside the store process every Interval milliseconds.
+%% The store is linked to its owner, so a store that fails stops its owner and
+%% the owner's supervisor rebuilds both. It also monitors the owner, because a
+%% link does not report an owner that exits normally.
 start(State, Cleanup, Interval) ->
-    case gen_server:start(?MODULE, {self(), State, Cleanup, Interval}, []) of
+    case gen_server:start_link(?MODULE, {self(), State, Cleanup, Interval}, []) of
         {ok, Pid} -> {ok, Pid};
         {error, _} -> {error, nil}
     end.
