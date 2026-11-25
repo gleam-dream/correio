@@ -27,6 +27,7 @@ Commit `gleam.toml` and `manifest.toml` to retain the resolved versions and Git 
 - Call `migrate` explicitly during deployment. Authentication requests never run migrations.
 - Call the returned store's `cleanup(limit)` explicitly to delete eligible terminal rows.
 - A timeout or missing commit acknowledgement returns `Unknown`. Retain the opaque recovery handle and recover through the same store.
+- A pool with no available connection returns `Unavailable`: no statement ran, so there is nothing to recover. A statement the server refused inside a transaction that it then rolled back returns `IncompatibleData` (a missing table, a constraint or data error) or `Unavailable` (lock, resource, and cancellation errors).
 
 ## Test
 
