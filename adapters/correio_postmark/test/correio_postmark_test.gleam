@@ -5,7 +5,7 @@ import correio_postmark as postmark
 import gleam/dynamic/decode
 import gleam/json
 import gleam/list
-import gleam/option.{Some}
+import gleam/option.{None, Some}
 import gleam/result
 import gleam/string
 import gleeunit
@@ -119,6 +119,8 @@ pub fn native_postmark_request_preserves_capabilities_test() {
     |> postmark.track_links(postmark.NoLinks)
   let assert delivery.Accepted(receipt) = postmark.send(config, mail, options)
   receipt.provider_id |> should.equal(Some("provider-local-id"))
+  // Postmark writes its own Message-ID header, so Correio has none to report.
+  receipt.message_id |> should.equal(None)
   list.length(receipt.recipients) |> should.equal(2)
   let #(head, body) = report(peer)
   string.starts_with(head, "POST /email HTTP/1.1\r\n") |> should.be_true

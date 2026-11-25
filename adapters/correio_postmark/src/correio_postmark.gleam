@@ -433,8 +433,9 @@ fn response(
           case id != "" && string.byte_size(id) <= 256 && safe_text(id) {
             True ->
               delivery.Accepted(delivery.Receipt(
-                Some(id),
-                message.envelope(mail).1,
+                message_id: None,
+                provider_id: Some(id),
+                recipients: message.envelope(mail).1,
               ))
             False -> delivery.OutcomeUnknown
           }
