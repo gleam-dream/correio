@@ -2,6 +2,11 @@
 
 <a id="adr-0006"></a>
 
+[ADR 0011](0011-consume-published-siblings-from-hex.md) supersedes the Git
+dependency declarations below, and the manifest now records a sibling's Hex
+version and checksum, not a commit. The single lock and the update, cache and
+credential rules remain.
+
 ## Decision
 
 - The Postmark adapter and the browser demo depend on the unpublished HTTP Gun and Hellhound packages as Git dependencies on `main`. No `gleam.toml` names a commit.
