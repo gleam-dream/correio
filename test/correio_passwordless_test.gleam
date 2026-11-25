@@ -366,3 +366,79 @@ pub fn wrong_attempt_receipt_survives_later_consumption_test() {
   |> should.equal(Error(auth.Refused(store.WrongAnswer)))
   memory.stop(runtime) |> should.equal(Ok(Nil))
 }
+
+pub fn full_store_evicts_expired_unconsumed_challenges_test() {
+  let clock = clock_new(1000)
+  let assert Ok(runtime) = memory.start_with_clock(2, fn() { clock_get(clock) })
+  let assert Ok(service) = auth.new(memory.store(runtime), "app", "login", key)
+  let assert Ok(service) = auth.with_policy(service, 10, 2, 86_400_000)
+  let assert Ok(_) = auth.issue(service, Account(1), email, auth.MagicLink)
+  let assert Ok(_) = auth.issue(service, Account(2), email, auth.MagicLink)
+  auth.issue(service, Account(3), email, auth.MagicLink)
+  |> should.equal(Error(auth.IssueFailed(store.Capacity)))
+  // Both challenges are past validity and far inside receipt retention.
+  clock_set(clock, 1010)
+  let assert Ok(_) = auth.issue(service, Account(3), email, auth.MagicLink)
+  let assert Ok(_) = auth.issue(service, Account(4), email, auth.MagicLink)
+  auth.issue(service, Account(5), email, auth.MagicLink)
+  |> should.equal(Error(auth.IssueFailed(store.Capacity)))
+  memory.stop(runtime) |> should.equal(Ok(Nil))
+}
+
+pub fn full_store_keeps_consumption_receipts_inside_retention_test() {
+  let clock = clock_new(1000)
+  let assert Ok(runtime) = memory.start_with_clock(1, fn() { clock_get(clock) })
+  let backing = memory.store(runtime)
+  let loss = clock_new(0)
+  let unreliable =
+    store.Store(..backing, verify: fn(command) {
+      let result = backing.verify(command)
+      case increment(loss) == 1 {
+        True -> Error(store.Unknown)
+        False -> result
+      }
+    })
+  let assert Ok(service) = auth.new(unreliable, "app", "login", key)
+  let assert Ok(service) = auth.with_policy(service, 10, 2, 20)
+  let assert Ok(challenge) =
+    auth.issue(service, Account(1), email, auth.MagicLink)
+  let assert Error(auth.VerifyUnknown(recovery)) =
+    auth.verify(
+      service,
+      auth.challenge_id(challenge),
+      email,
+      auth.challenge_answer(challenge),
+    )
+  clock_set(clock, 1029)
+  auth.issue(service, Account(2), email, auth.MagicLink)
+  |> should.equal(Error(auth.IssueFailed(store.Capacity)))
+  let assert Ok(verified) = auth.recover_verify(recovery)
+  auth.subject(verified) |> should.equal(Account(1))
+  // Retention has ended, so the receipt no longer holds its slot.
+  clock_set(clock, 1030)
+  let assert Ok(_) = auth.issue(service, Account(2), email, auth.MagicLink)
+  memory.stop(runtime) |> should.equal(Ok(Nil))
+}
+
+pub fn store_removes_rows_past_retention_without_a_cleanup_call_test() {
+  let clock = clock_new(1000)
+  let assert Ok(runtime) =
+    memory.start_with_cleanup_interval(10, fn() { clock_sample(clock) }, 1)
+  let backing = memory.store(runtime)
+  let assert Ok(service) = auth.new(backing, "app", "login", key)
+  let assert Ok(service) = auth.with_policy(service, 10, 2, 20)
+  let assert Ok(_) = auth.issue(service, Account(1), email, auth.MagicLink)
+  let assert Ok(_) = auth.issue(service, Account(2), email, auth.MagicLink)
+  clock_set(clock, 1030)
+  // The store samples its clock only inside a command or its own cleanup, and
+  // no command runs here, so this sample is the store's own cleanup.
+  await_sample(1030) |> should.equal(Ok(Nil))
+  backing.cleanup(10) |> should.equal(Ok(0))
+  memory.stop(runtime) |> should.equal(Ok(Nil))
+}
+
+@external(erlang, "correio_auth_test_ffi", "clock_sample")
+fn clock_sample(clock: Clock) -> Int
+
+@external(erlang, "correio_auth_test_ffi", "await_sample")
+fn await_sample(value: Int) -> Result(Nil, Nil)
