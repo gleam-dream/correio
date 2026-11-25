@@ -216,3 +216,71 @@ pub fn long_values_fold_within_line_limits_test() {
   let #(_, fields) = rendered(mail)
   field(fields, "subject") |> should.equal(padded)
 }
+
+fn text_message(body: String) -> message.Message {
+  let assert Ok(a) = address.parse("a@example.com")
+  let assert Ok(mail) = message.new(a, a, "Subject", message.Text(body))
+  mail
+}
+
+/// Each case is the text body, the transfer encoding the renderer must choose
+/// for it, and the body a reader decodes. Text line breaks decode as CRLF.
+pub fn text_transfer_encoding_choice_test() {
+  [
+    #("plain words", "7bit", "plain words"),
+    #("tab\tinside", "7bit", "tab\tinside"),
+    #("=?UTF-8?B?eA==?= stays", "7bit", "=?UTF-8?B?eA==?= stays"),
+    #("from is lower case", "7bit", "from is lower case"),
+    #(" From after a space", "7bit", " From after a space"),
+    #(string.repeat("x", 998), "7bit", string.repeat("x", 998)),
+    #(string.repeat("x", 999), "quoted-printable", string.repeat("x", 999)),
+    #("trailing space ", "quoted-printable", "trailing space "),
+    #("trailing tab\t", "quoted-printable", "trailing tab\t"),
+    #(
+      "space before break \nnext",
+      "quoted-printable",
+      "space before break \r\nnext",
+    ),
+    #("From the team", "quoted-printable", "From the team"),
+    #("Hello\nFrom the team", "quoted-printable", "Hello\r\nFrom the team"),
+    #("form\u{000C}feed", "quoted-printable", "form\u{000C}feed"),
+    // Two of four bytes are outside ASCII: quoted-printable is exactly twice
+    // the text, the largest size that keeps it.
+    #("Olá", "quoted-printable", "Olá"),
+    #("日本語", "base64", "日本語"),
+    #("lone\rreturn", "base64", "lone\rreturn"),
+  ]
+  |> list.each(fn(case_) {
+    let #(body, encoding, decoded) = case_
+    let #(_, fields) = rendered(text_message(body))
+    #(body, field(fields, "part.0.encoding"))
+    |> should.equal(#(body, encoding))
+    #(body, field(fields, "part.0.body")) |> should.equal(#(body, decoded))
+  })
+}
+
+/// LF, CRLF and mixed line breaks in text leave the renderer as CRLF, and a
+/// 7bit body is the text itself on the wire.
+pub fn text_line_breaks_are_crlf_on_the_wire_test() {
+  ["one\ntwo\nthree", "one\r\ntwo\r\nthree", "one\ntwo\r\nthree"]
+  |> list.each(fn(body) {
+    let #(text, fields) = rendered(text_message(body))
+    string.ends_with(text, "\r\n\r\none\r\ntwo\r\nthree") |> should.be_true
+    field(fields, "part.0.encoding") |> should.equal("7bit")
+  })
+}
+
+/// Quoted-printable lines stay within RFC 2045's 76 characters, soft breaks
+/// included, and decode to the original text.
+pub fn quoted_printable_lines_fit_76_characters_test() {
+  let body =
+    string.repeat("Olá, mundo = ", 100) <> "\n" <> string.repeat("b", 500)
+  let #(text, fields) = rendered(text_message(body))
+  field(fields, "part.0.encoding") |> should.equal("quoted-printable")
+  field(fields, "part.0.body")
+  |> should.equal(string.replace(body, "\n", "\r\n"))
+  let assert [_, content] = string.split(text, "\r\n\r\n")
+  string.split(content, "\r\n")
+  |> list.all(fn(line) { string.byte_size(line) <= 76 })
+  |> should.be_true
+}
