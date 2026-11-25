@@ -1,6 +1,6 @@
-<a id="adr-0011"></a>
+<a id="adr-0012"></a>
 
-# ADR-0011: The memory store runs only under the application's supervisor
+# ADR-0012: The memory store runs only under the application's supervisor
 
 Status: accepted
 Date: 2026-11-25
