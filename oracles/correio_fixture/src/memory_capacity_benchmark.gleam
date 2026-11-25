@@ -1,8 +1,12 @@
 //// Issue latency of the memory store at capacity. Prints one JSON line per
 //// case. Run with `gleam run -m memory_capacity_benchmark`; no database needed.
+//// A capacity refusal is an observation. Any other issue failure is an
+//// infrastructure failure: it is counted, and the command fails after every
+//// case has printed its line.
 
 import correio/passwordless
 import correio/passwordless/memory
+import correio/passwordless/store
 import gleam/erlang/process
 import gleam/int
 import gleam/io
@@ -16,25 +20,45 @@ const capacity = 100_000
 const samples = 200
 
 pub fn main() {
+  let errors =
+    [
+      run_expired_together(),
+      run_expired_one_per_issue(),
+      run_none_expired(),
+    ]
+    |> int.sum
+  case errors {
+    0 -> Nil
+    _ -> panic as { int.to_string(errors) <> " infrastructure failures" }
+  }
+}
+
+fn run_expired_together() -> Int {
   // Every retained challenge expires at the same instant, then issuance resumes.
   run("expired_together", fn(clock, service) {
     fill(service)
     clock_set(clock, 1_000_000)
     fn() { issue(service) }
   })
+}
+
+fn run_expired_one_per_issue() -> Int {
   // One retained challenge expires per millisecond and each issue arrives one
   // millisecond after the previous one, so each issue can free one slot at most.
   run("expired_one_per_issue", fn(clock, service) {
     list.repeat(Nil, capacity)
     |> list.each(fn(_) {
       clock_set(clock, clock_get(clock) + 1)
-      issue(service)
+      prepared(issue(service))
     })
     fn() {
       clock_set(clock, clock_get(clock) + 1)
       issue(service)
     }
   })
+}
+
+fn run_none_expired() -> Int {
   // Nothing has expired: every issue is refused.
   run("none_expired", fn(_clock, service) {
     fill(service)
@@ -45,7 +69,7 @@ pub fn main() {
 fn run(
   name: String,
   prepare: fn(Clock, passwordless.Service(Int)) -> fn() -> String,
-) -> Nil {
+) -> Int {
   let clock = clock_new(0)
   let challenges = process.new_name("benchmark_challenges")
   let assert Ok(config) = memory.new(challenges, capacity)
@@ -71,6 +95,8 @@ fn run(
   let latencies =
     list.map(observed, fn(pair) { pair.0 }) |> list.sort(int.compare)
   let issued = list.count(observed, fn(pair) { pair.1 == "issued" })
+  let refused = list.count(observed, fn(pair) { pair.1 == "refused" })
+  let errors = list.count(observed, fn(pair) { pair.1 == "error" })
   io.println(
     "{\"case\":\""
     <> name
@@ -80,20 +106,34 @@ fn run(
     <> int.to_string(samples)
     <> ",\"issued\":"
     <> int.to_string(issued)
+    <> ",\"refused\":"
+    <> int.to_string(refused)
+    <> ",\"errors\":"
+    <> int.to_string(errors)
     <> ",\"p50_us\":"
-    <> int.to_string(nth(latencies, samples / 2))
+    <> int.to_string(nearest_rank(latencies, 50))
     <> ",\"p95_us\":"
-    <> int.to_string(nth(latencies, samples * 95 / 100))
+    <> int.to_string(nearest_rank(latencies, 95))
     <> ",\"max_us\":"
-    <> int.to_string(nth(latencies, samples - 1))
+    <> int.to_string(nearest_rank(latencies, 100))
     <> "}",
   )
   process.unlink(challenge_supervisor.pid)
   process.kill(challenge_supervisor.pid)
+  errors
 }
 
+/// Fills the store to capacity. Preparation must issue every challenge, so
+/// measurement always starts from a full store.
 fn fill(service: passwordless.Service(Int)) -> Nil {
-  list.repeat(Nil, capacity) |> list.each(fn(_) { issue(service) })
+  list.repeat(Nil, capacity) |> list.each(fn(_) { prepared(issue(service)) })
+}
+
+fn prepared(outcome: String) -> Nil {
+  case outcome {
+    "issued" -> Nil
+    _ -> panic as { "preparation did not issue: " <> outcome }
+  }
 }
 
 fn issue(service: passwordless.Service(Int)) -> String {
@@ -106,8 +146,15 @@ fn issue(service: passwordless.Service(Int)) -> String {
     )
   {
     Ok(_) -> "issued"
-    Error(_) -> "refused"
+    Error(passwordless.IssueFailed(store.Capacity)) -> "refused"
+    Error(_) -> "error"
   }
+}
+
+/// The nearest-rank percentile of sorted values: the value at rank
+/// ceil(percent * n / 100), counted from one.
+fn nearest_rank(values: List(Int), percent: Int) -> Int {
+  nth(values, { percent * list.length(values) + 99 } / 100 - 1)
 }
 
 fn nth(values: List(Int), index: Int) -> Int {

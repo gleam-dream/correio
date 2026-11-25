@@ -30,7 +30,7 @@ nix develop -c scripts/benchmark
 - `CORREIO_BENCHMARK_RESULTS` selects the output directory. The default is `benchmarks/results`, which is git-ignored.
 - `samples.json` retains every latency and outcome. `report.json` retains the host and CPU, PostgreSQL, Gleam, and OTP versions, scheduler count, workload configuration, source digest, throughput, outcome counts, and percentiles.
 - The CI benchmark workflow runs only when dispatched and keeps its output for thirty days.
-- `gleam run -m memory_capacity_benchmark` in `oracles/correio_fixture` measures issue latency of a full memory store (challenges expired together, expired one per issue, none expired). It needs no database and prints one JSON line per case.
+- `gleam run -m memory_capacity_benchmark` in `oracles/correio_fixture` measures issue latency of a full memory store (challenges expired together, expired one per issue, none expired). It needs no database and prints one JSON line per case with issued, refused, and error counts. An issue failure other than a capacity refusal fails the command after every case has printed.
 
 ## Retained results
 
