@@ -12,10 +12,12 @@ Date: 2026-11-25
 - Each package's `manifest.toml` locks the resolved version and checksum.
   `gleam deps update <package>` is the only way a sibling moves.
 
-This supersedes the Git dependency declarations in
-[ADR 0006](0006-unpublished-siblings-are-git-dependencies-on-main.md). Its
-single lock, explicit updates, absence of a shared compiled cache and
-credential limits remain.
+This supersedes two statements in
+[ADR 0006](0006-unpublished-siblings-are-git-dependencies-on-main.md): the Git
+dependency declarations on `main`, and the manifest recording a sibling commit.
+The manifest now records a version and checksum. ADR 0006's single lock,
+explicit updates, absence of a shared compiled cache and credential limits
+remain.
 
 ## Rationale
 
