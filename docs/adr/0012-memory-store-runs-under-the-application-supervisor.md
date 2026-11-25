@@ -43,6 +43,9 @@ specification and the name.
 - Capacity is checked before any process starts, so an invalid capacity never
   reaches the supervisor.
 - A command sent while no process holds the name returns `Unavailable`; a
-  command in progress when the store fails returns `Unknown` with a recovery
-  handle, which then resolves against the restarted, empty store.
+  command in progress when the store fails returns `Unknown`. An issue,
+  verify, or revoke mutation that ends `Unknown` carries a recovery handle,
+  which then resolves against the restarted, empty store. A failed clock read
+  at the start of an issue ends `Unknown` without a handle, because no issue
+  command exists yet.
 - The capture process is unchanged and keeps its explicit start and stop.

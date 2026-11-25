@@ -23,7 +23,9 @@ pub fn new(pool: process.Name(pog.Message), codec: Codec(a)) -> store.Store(a) {
   configured(pog.named_connection(pool), codec, 5000)
 }
 
-/// Query deadlines bound lock waits and exchanges. A timeout remains Unknown.
+/// Query deadlines bound lock waits and exchanges. A statement that times out
+/// inside a transaction whose rollback the server acknowledged is
+/// `Unavailable`. A timeout that leaves a commit uncertain is `Unknown`.
 pub fn with_timeout(
   pool: process.Name(pog.Message),
   codec: Codec(a),
