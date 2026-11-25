@@ -468,6 +468,49 @@ pub fn failed_store_restarts_empty_under_its_name_test() {
   stop(runtime)
 }
 
+/// An issue recovery handle is bound to the store process that produced its
+/// command. After a restart it cannot insert the challenge again, even before
+/// the challenge's original expiry, so a consumed challenge stays unusable.
+pub fn issue_recovery_cannot_recreate_a_challenge_after_restart_test() {
+  let assert Ok(runtime) = start(10)
+  let backing = runtime.store
+  let loss = clock_new(0)
+  let unreliable =
+    store.Store(..backing, issue: fn(command) {
+      let result = backing.issue(command)
+      case increment(loss) == 1 {
+        True -> Error(store.Unknown)
+        False -> result
+      }
+    })
+  let assert Ok(service) = auth.new(unreliable, "app", "login", key)
+  let assert Error(auth.IssueUnknown(recovery)) =
+    auth.issue(service, Account(1), email, auth.MagicLink)
+  let assert Ok(challenge) = auth.recover_issue(recovery)
+  let assert Ok(_) =
+    auth.verify(
+      service,
+      auth.challenge_id(challenge),
+      email,
+      auth.challenge_answer(challenge),
+    )
+  let assert Ok(failed) = process.named(runtime.name)
+  process.kill(failed)
+  let assert Ok(_) = await_restart(runtime.name, failed)
+  auth.recover_issue(recovery)
+  |> should.equal(Error(auth.IssueFailed(store.IssueExpired)))
+  auth.verify(
+    service,
+    auth.challenge_id(challenge),
+    email,
+    auth.challenge_answer(challenge),
+  )
+  |> should.equal(Error(auth.Refused(store.Missing)))
+  // A fresh issue reaches the restarted store.
+  let assert Ok(_) = auth.issue(service, Account(2), email, auth.MagicLink)
+  stop(runtime)
+}
+
 pub fn store_failure_leaves_its_callers_running_test() {
   let assert Ok(runtime) =
     start_configured(10, fn(config) {

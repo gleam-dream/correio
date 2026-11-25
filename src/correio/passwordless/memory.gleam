@@ -33,9 +33,12 @@ pub type InvalidCapacity {
 
 /// Each index holds one `#(time, id)` entry per row it covers, ordered by
 /// time. `expiries` covers rows that were never consumed, by `expires_at`;
-/// `retentions` covers every row, by `retain_until`.
+/// `retentions` covers every row, by `retain_until`. `incarnation` is created
+/// when the process starts, so a restarted store refuses every issue command
+/// stamped before its restart.
 type State(a) {
   State(
+    incarnation: String,
     clock: fn() -> Int,
     rows: Dict(String, store.Row(a)),
     capacity: Int,
@@ -98,11 +101,20 @@ pub fn with_cleanup_interval(config: Config(a), interval_ms: Int) -> Config(a) {
 /// fails is restarted empty under the same name, and every `store.Store` built
 /// with `store` reaches the replacement. A command in progress when the store
 /// fails returns `Unknown`; a command sent while no store is registered
-/// returns `Unavailable`.
+/// returns `Unavailable`. The replacement starts a new incarnation, so an
+/// issue recovery handle from before the restart is refused as `IssueExpired`
+/// and cannot insert its challenge again.
 pub fn supervised(config: Config(a)) -> ChildSpecification(store.Store(a)) {
   supervision.worker(fn() {
     let state =
-      State(config.clock, dict.new(), config.capacity, index_new(), index_new())
+      State(
+        new_incarnation(),
+        config.clock,
+        dict.new(),
+        config.capacity,
+        index_new(),
+        index_new(),
+      )
     start_process(
       config.name,
       state,
@@ -122,18 +134,27 @@ pub fn supervised(config: Config(a)) -> ChildSpecification(store.Store(a)) {
 /// holds the name when the command is sent.
 pub fn store(name: Name(Message(a))) -> store.Store(a) {
   store.Store(
-    now: fn() { call(name, fn(state: State(a)) { #(state, state.clock()) }) },
+    now: fn() {
+      call(name, fn(state: State(a)) {
+        #(state, store.Instant(state.clock(), state.incarnation))
+      })
+    },
     issue: fn(command) {
       call(name, fn(state: State(a)) {
         let now = state.clock()
-        case dict.get(state.rows, command.id) {
-          Ok(row) ->
+        case
+          command.incarnation == state.incarnation,
+          dict.get(state.rows, command.id)
+        {
+          // Stamped before a restart: the row it may have written is lost.
+          False, _ -> #(state, Error(store.IssueExpired))
+          True, Ok(row) ->
             case store.same_issue(row, command), now < row.retain_until {
               False, _ -> #(state, Error(store.IdentityCollision))
               True, False -> #(state, Error(store.IssueExpired))
               True, True -> #(state, Ok(row))
             }
-          Error(_) ->
+          True, Error(_) ->
             case now >= command.expires_at {
               True -> #(state, Error(store.IssueExpired))
               False -> {
@@ -263,6 +284,9 @@ fn call(
   name: Name(Message(a)),
   function: fn(State(a)) -> #(State(a), reply),
 ) -> Result(reply, store.Fault)
+
+@external(erlang, "correio_auth_memory_ffi", "incarnation")
+fn new_incarnation() -> String
 
 @external(erlang, "correio_auth_memory_ffi", "system_milliseconds")
 fn system_milliseconds() -> Int

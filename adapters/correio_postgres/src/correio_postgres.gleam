@@ -43,7 +43,12 @@ fn configured(
   timeout: Int,
 ) -> store.Store(a) {
   store.Store(
-    now: fn() { protect(fn() { now(db, timeout) }) },
+    now: fn() {
+      protect(fn() {
+        now(db, timeout)
+        |> result.map(store.Instant(_, incarnation))
+      })
+    },
     issue: fn(command) {
       transaction(db, fn(connection) {
         issue(connection, codec, timeout, command)
@@ -146,6 +151,11 @@ fn migrate_schema(db: pog.Connection) -> Result(Nil, store.Fault) {
   |> result.map(fn(_) { Nil })
   |> result.map_error(write_fault)
 }
+
+/// PostgreSQL rows outlive every application and database restart, so the
+/// store has one incarnation. The insert itself refuses a command whose
+/// challenge has expired, and a consumed row stays until its retention ends.
+const incarnation = "postgresql"
 
 fn now(db: pog.Connection, timeout: Int) -> Result(Int, store.Fault) {
   use rows <- result.try(

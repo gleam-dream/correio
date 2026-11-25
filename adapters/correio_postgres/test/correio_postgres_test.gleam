@@ -427,6 +427,7 @@ pub fn pool_without_a_connection_is_unavailable_not_unknown_test() {
     2,
     3,
     5,
+    "postgresql",
   ))
   |> should.equal(Error(store.Unavailable))
   backing.cleanup(10) |> should.equal(Error(store.Unavailable))

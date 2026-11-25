@@ -1,6 +1,6 @@
 -module(correio_auth_memory_ffi).
 -behaviour(gen_server).
--export([start/4, call/2, system_milliseconds/0]).
+-export([start/4, call/2, incarnation/0, system_milliseconds/0]).
 -export([index_new/0, index_insert/3, index_delete/3, index_first/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
@@ -21,6 +21,8 @@ call(Name, Function) ->
         exit:{noproc, _} -> {error, unavailable};
         exit:_ -> {error, unknown}
     end.
+%% 128 random bits name one lifetime of a store process.
+incarnation() -> base64:encode(crypto:strong_rand_bytes(16), #{mode => urlsafe, padding => false}).
 system_milliseconds() -> erlang:system_time(millisecond).
 %% An ordered set of {Time, Id} entries.
 index_new() -> gb_sets:new().
