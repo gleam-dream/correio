@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Each adapter must resolve beside the newest Hex release of every gleam-dream
+# package it depends on. An adapter's own manifest resolves it alone, so a stale
+# range passes its own tests and still fails in an application that uses a
+# sibling library on the current release. This resolves that application: an
+# empty package that depends on the adapter and on exactly the newest stable
+# Hex release of each shared package the adapter names.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+root=$PWD
+shared=(correio http_gun)
+failed=0
+for adapter in adapters/correio_postgres adapters/correio_postmark adapters/correio_mailbox; do
+  name=$(basename "$adapter")
+  work=$(mktemp -d)
+  trap 'rm -rf "$work"' EXIT
+  mkdir -p "$work/src"
+  cat >"$work/gleam.toml" <<EOF
+name = "sibling_check"
+version = "0.0.0"
+target = "erlang"
+
+[dependencies]
+$name = { path = "$root/$adapter" }
+EOF
+  for package in "${shared[@]}"; do
+    if grep -q "^$package = " "$adapter/gleam.toml"; then
+      newest=$(curl -fsS "https://hex.pm/api/packages/$package" |
+        python3 -c 'import json, sys; print(json.load(sys.stdin)["latest_stable_version"])')
+      echo "$package = \"== $newest\"" >>"$work/gleam.toml"
+    fi
+  done
+  if ! (cd "$work" && gleam deps download >"$work/log" 2>&1); then
+    echo "$name does not resolve beside the newest releases of its shared packages:" >&2
+    sed -n '/\[dependencies\]/,$p' "$work/gleam.toml" >&2
+    cat "$work/log" >&2
+    failed=1
+  fi
+  rm -rf "$work"
+  trap - EXIT
+done
+exit "$failed"
