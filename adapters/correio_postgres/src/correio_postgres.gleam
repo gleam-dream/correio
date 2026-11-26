@@ -5,6 +5,7 @@
 import correio/passwordless/store
 import gleam/dynamic/decode
 import gleam/erlang/process
+import gleam/int
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
@@ -50,12 +51,12 @@ fn configured(
       })
     },
     issue: fn(command) {
-      transaction(db, fn(connection) {
+      transaction(db, timeout, fn(connection) {
         issue(connection, codec, timeout, command)
       })
     },
     verify: fn(command) {
-      transaction(db, fn(connection) {
+      transaction(db, timeout, fn(connection) {
         use found <- result.try(find_locked(
           connection,
           codec,
@@ -74,7 +75,7 @@ fn configured(
       })
     },
     revoke: fn(command) {
-      transaction(db, fn(connection) {
+      transaction(db, timeout, fn(connection) {
         use found <- result.try(find_locked(
           connection,
           codec,
@@ -323,12 +324,29 @@ fn save_transition(
 /// so such a fault is definite. `TransactionQueryError` carries a failed
 /// checkout, begin, commit, or rollback; only a failed checkout proves that
 /// nothing ran.
+///
+/// Pog applies no deadline to statements on a transaction's connection, so the
+/// transaction first sets a transaction-local `statement_timeout`. The server
+/// then cancels a statement, including a row-lock wait, that outlasts the
+/// timeout and rolls the transaction back.
 fn transaction(
   db: pog.Connection,
+  timeout: Int,
   function: fn(pog.Connection) -> Result(a, store.Fault),
 ) -> Result(a, store.Fault) {
   protect(fn() {
-    case pog.transaction(db, function) {
+    case
+      pog.transaction(db, fn(connection) {
+        use _ <- result.try(
+          pog.query("select set_config('statement_timeout', $1, true)")
+          |> pog.parameter(pog.text(int.to_string(timeout)))
+          |> pog.timeout(timeout)
+          |> pog.execute(connection)
+          |> result.map_error(uncommitted_fault),
+        )
+        function(connection)
+      })
+    {
       Ok(value) -> Ok(value)
       Error(pog.TransactionRolledBack(error)) -> Error(error)
       Error(pog.TransactionQueryError(pog.ConnectionUnavailable)) ->
