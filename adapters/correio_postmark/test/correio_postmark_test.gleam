@@ -244,6 +244,18 @@ pub fn excessive_response_preserves_observed_rejection_test() {
   http_gun.stop(client)
 }
 
+pub fn excessive_refused_token_response_is_authentication_failure_test() {
+  use status <- list.each([401, 403])
+  let #(port, peer) = peer(Reply(status, string.repeat("x", 1000)))
+  let client = client()
+  let assert Ok(config) =
+    configured(client, port) |> postmark.response_limit(10)
+  postmark.send(config, mail(), postmark.options())
+  |> should.equal(delivery.NotSent(delivery.AuthenticationFailed))
+  let _ = report(peer)
+  http_gun.stop(client)
+}
+
 pub fn unsupported_envelope_is_refused_before_network_test() {
   let client = client()
   let assert Ok(bounce) = address.parse("bounces@example.com")
