@@ -18,7 +18,7 @@ Add Correio and Pog from Hex and the PostgreSQL adapter from its Git subdirector
 [dependencies]
 correio = ">= 0.2.0 and < 0.3.0"
 pog = ">= 4.0.0 and < 5.0.0"
-correio_postgres = { git = "https://github.com/gleam-dream/correio.git", ref = "main", path = "adapters/correio_postgres" }
+correio_postgres = { git = "https://github.com/gleam-dream/correio.git", ref = "correio_postgres-v0.2.0", path = "adapters/correio_postgres" }
 ```
 
 Commit `gleam.toml` and `manifest.toml` to retain the resolved versions and Git commit.
