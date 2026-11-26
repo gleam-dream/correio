@@ -17,7 +17,6 @@ import gleam/result
 import gleam/string
 import gleam/time/duration
 import http_gun
-import http_gun/config as http_config
 import http_gun/destination
 import http_gun/error as http_error
 import http_gun/redaction as http_redaction
@@ -205,9 +204,7 @@ pub fn send(
           let client =
             config.client
             |> http_gun.with_destination(policy)
-            |> http_gun.with_timeout(
-              http_config.After(duration.milliseconds(config.timeout_ms)),
-            )
+            |> http_gun.with_timeout(duration.milliseconds(config.timeout_ms))
             |> http_gun.with_body_limit(config.response_bytes, http_gun.Fail)
           case http_gun.send(client, req) {
             Ok(reply) ->
