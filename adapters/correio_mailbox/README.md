@@ -17,7 +17,7 @@ Add Correio from Hex and the mailbox adapter from its Git subdirectory:
 ```toml
 [dependencies]
 correio = ">= 0.2.0 and < 0.3.0"
-correio_mailbox = { git = "https://github.com/gleam-dream/correio.git", ref = "main", path = "adapters/correio_mailbox" }
+correio_mailbox = { git = "https://github.com/gleam-dream/correio.git", ref = "correio_mailbox-v0.2.0", path = "adapters/correio_mailbox" }
 ```
 
 Commit `gleam.toml` and `manifest.toml` to retain the resolved versions and Git commit.

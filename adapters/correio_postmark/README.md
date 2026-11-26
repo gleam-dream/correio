@@ -18,7 +18,7 @@ Add Correio and HTTP Gun from Hex and the Postmark adapter from its Git subdirec
 [dependencies]
 correio = ">= 0.2.0 and < 0.3.0"
 http_gun = ">= 0.1.0 and < 0.2.0"
-correio_postmark = { git = "https://github.com/gleam-dream/correio.git", ref = "main", path = "adapters/correio_postmark" }
+correio_postmark = { git = "https://github.com/gleam-dream/correio.git", ref = "correio_postmark-v0.2.0", path = "adapters/correio_postmark" }
 ```
 
 Commit `gleam.toml` and `manifest.toml` to retain the resolved versions and Git commit.
