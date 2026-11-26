@@ -234,6 +234,67 @@ pub fn database_expiry_is_sampled_after_actual_row_lock_wait_test() {
   stop_pool(admin.pid)
 }
 
+/// The configured timeout bounds a wait for a row lock inside a
+/// transaction. The server cancels the waiting statement and rolls the
+/// transaction back, so nothing was stored and storage is unavailable.
+pub fn database_row_lock_wait_is_bounded_by_the_timeout_test() {
+  let admin = connect()
+  let locker = connect()
+  let verifier = connect()
+  postgres.migrate(admin.data) |> should.equal(Ok(Nil))
+  let assert Ok(challenge) =
+    auth.issue(service(admin), Account(7), email, auth.MagicLink)
+  let locked = process.new_subject()
+  let completed = process.new_subject()
+  let _ =
+    process.spawn(fn() {
+      let release = process.new_subject()
+      let assert Ok(Nil) =
+        pog.transaction(locker.data, fn(connection) {
+          let assert Ok(_) =
+            pog.query("select id from ecarta_challenges where id=$1 for update")
+            |> pog.parameter(pog.text(auth.challenge_id(challenge)))
+            |> pog.execute(connection)
+          process.send(locked, release)
+          let assert Ok(Nil) = process.receive(release, 10_000)
+          Ok(Nil)
+        })
+      process.send(completed, Nil)
+    })
+  let assert Ok(release) = process.receive(locked, 5000)
+  let assert Ok(bounded) = postgres.with_timeout(verifier.name, codec(), 200)
+  let assert Ok(bounded) = auth.new(bounded, "test", "login", key)
+  let reply = process.new_subject()
+  let _ =
+    process.spawn(fn() {
+      process.send(
+        reply,
+        auth.verify(
+          bounded,
+          auth.challenge_id(challenge),
+          email,
+          auth.challenge_answer(challenge),
+        ),
+      )
+    })
+  // The lock is held for up to ten seconds; the reply must come well before.
+  let outcome = process.receive(reply, 2000)
+  process.send(release, Nil)
+  outcome |> should.equal(Ok(Error(auth.VerifyFailed(store.Unavailable))))
+  process.receive(completed, 5000) |> should.equal(Ok(Nil))
+  // The challenge was not consumed by the cancelled verification.
+  let assert Ok(_) =
+    auth.verify(
+      service(admin),
+      auth.challenge_id(challenge),
+      email,
+      auth.challenge_answer(challenge),
+    )
+  stop_pool(verifier.pid)
+  stop_pool(locker.pid)
+  stop_pool(admin.pid)
+}
+
 fn wait_for_lock(db: pog.Connection, remaining: Int) -> Bool {
   let assert Ok(rows) =
     pog.query(
