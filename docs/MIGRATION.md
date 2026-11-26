@@ -108,7 +108,7 @@ delivery.Accepted(delivery.Receipt(
 
 Affects applications that use `correio_postmark` and branch on `Rejected(Permanent)`.
 
-**What changed.** HTTP 401 and 403 from Postmark return `NotSent(AuthenticationFailed)` instead of `Rejected(Permanent)` when the response body is within the configured response limit (64 KiB by default). A 401 or 403 whose body exceeds the limit still returns `Rejected(Permanent)`. Every other status keeps its mapping.
+**What changed.** HTTP 401 and 403 from Postmark return `NotSent(AuthenticationFailed)` instead of `Rejected(Permanent)`, whatever the size of the response body. Every other status keeps its mapping.
 
 **Why.** Postmark refuses a missing or wrong server token before it processes the message, so nothing was submitted and no recipient was judged. A rotated token looked like an undeliverable address.
 
@@ -121,7 +121,7 @@ case send(message) {
 }
 ```
 
-**After.** Handle the credential failure as a configuration fault. `Rejected(Permanent)` carries no detail on which recipient was refused, and it can still arise from a token failure with an oversized body, so do not suppress recipients on every `Rejected(Permanent)`. Record the outcome and decide by your own policy.
+**After.** Handle the credential failure as a configuration fault. `Rejected(Permanent)` carries no detail on which recipient was refused, so do not suppress recipients on every `Rejected(Permanent)`. Record the outcome and decide by your own policy.
 
 ```gleam
 case send(message) {
