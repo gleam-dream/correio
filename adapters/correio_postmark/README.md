@@ -59,7 +59,7 @@ let assert delivery.Accepted(receipt) = send(mail())
 <!-- prettier-ignore-end -->
 
 - The application owns the HTTP Gun client and its shutdown. `sender(provider, options)` supplies Correio's common `delivery.Sender` function.
-- HTTP 401 and 403 mean Postmark refused the server token before it processed the message. The sender returns `NotSent(AuthenticationFailed)`, not `Rejected(Permanent)`; treat it as a configuration fault. The receipt's `message_id` is `None` because Postmark writes its own header; its identifier is in `provider_id`.
+- HTTP 401 and 403 mean Postmark refused the server token before it processed the message. When the response body is within `response_limit`, the sender returns `NotSent(AuthenticationFailed)`, not `Rejected(Permanent)`; treat it as a configuration fault. A 401 or 403 with an oversized body still returns `Rejected(Permanent)`, so do not suppress recipients on every `Rejected(Permanent)`. The receipt's `message_id` is `None` because Postmark writes its own header; its identifier is in `provider_id`.
 - Configure `redact_token` before starting a client or recording. The default redaction policy does not hide the Postmark server token, and recordings also retain message bodies and addresses unless `redaction.with_body` is supplied.
 - `local_test(provider, port)` targets a loopback server, and the client must also allow loopback destinations.
 - Postmark's [email API](https://postmarkapp.com/developer/api/email-api) and [API overview](https://postmarkapp.com/developer/api/overview) define message fields, acceptance responses, and rejection codes.

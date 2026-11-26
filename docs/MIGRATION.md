@@ -46,7 +46,7 @@ Steps:
 4. Build the store with `memory.store(name)`. It takes the name, not a runtime value.
 5. Delete the `memory.stop` call and the field that held the runtime. Stop the store by stopping its supervisor.
 
-The core package now depends on `gleam_otp` and `gleam_erlang` (each `>= 1.0.0 and < 2.0.0`). Run `gleam deps update` after raising the Correio version.
+The core package now depends on `gleam_otp` and `gleam_erlang` (each `>= 1.0.0 and < 2.0.0`). Run `gleam deps update correio` after raising the Correio version, naming each installed adapter as well (section 2).
 
 Behavior to know:
 
@@ -73,7 +73,7 @@ correio = ">= 0.1.0 and < 0.2.0"
 correio = ">= 0.2.0 and < 0.3.0"
 ```
 
-Change the range in your `gleam.toml`, then run `gleam deps update correio` and commit `manifest.toml`. Adapters install from Git subdirectories until they are on Hex; the install lines in each adapter README show the current form.
+Change the range in your `gleam.toml`, then run `gleam deps update correio correio_postmark` (a project that installs the Postmark adapter) and commit `manifest.toml`. Add each adapter your project installs to that command instead, using the dependency name from its install line: a locked adapter at its 0.1 revision requires Correio 0.1 and blocks the update unless it is unlocked too. Adapters install from Git subdirectories until they are on Hex; the install lines in each adapter README show the current form.
 
 ## 3. Receipts carry the Message-ID
 
@@ -108,7 +108,7 @@ delivery.Accepted(delivery.Receipt(
 
 Affects applications that use `correio_postmark` and branch on `Rejected(Permanent)`.
 
-**What changed.** HTTP 401 and 403 from Postmark return `NotSent(AuthenticationFailed)` instead of `Rejected(Permanent)`. Every other status keeps its mapping.
+**What changed.** HTTP 401 and 403 from Postmark return `NotSent(AuthenticationFailed)` instead of `Rejected(Permanent)` when the response body is within the configured response limit (64 KiB by default). A 401 or 403 whose body exceeds the limit still returns `Rejected(Permanent)`. Every other status keeps its mapping.
 
 **Why.** Postmark refuses a missing or wrong server token before it processes the message, so nothing was submitted and no recipient was judged. A rotated token looked like an undeliverable address.
 
@@ -121,12 +121,12 @@ case send(message) {
 }
 ```
 
-**After.** Handle the credential failure as a configuration fault, and keep recipient suppression for real rejections.
+**After.** Handle the credential failure as a configuration fault. `Rejected(Permanent)` carries no detail on which recipient was refused, and it can still arise from a token failure with an oversized body, so do not suppress recipients on every `Rejected(Permanent)`. Record the outcome and decide by your own policy.
 
 ```gleam
 case send(message) {
   delivery.NotSent(delivery.AuthenticationFailed) -> alert_operator()
-  delivery.Rejected(delivery.Permanent) -> suppress_recipients(message)
+  delivery.Rejected(delivery.Permanent) -> record_permanent_rejection(message)
   // ...
 }
 ```
@@ -211,7 +211,7 @@ The reasons are in [ADR 0012](https://github.com/gleam-dream/correio/blob/main/d
 
 ## Checklist
 
-- [ ] Raise `correio` to `>= 0.2.0 and < 0.3.0`, and run `gleam deps update correio`.
+- [ ] Raise `correio` to `>= 0.2.0 and < 0.3.0`, and run `gleam deps update correio` with the names of your installed adapters.
 - [ ] Move the memory store under your supervisor (section 1).
 - [ ] Add `message_id:` to every `delivery.Receipt` you build or match (section 3).
 - [ ] Handle `NotSent(AuthenticationFailed)` from Postmark (section 4).

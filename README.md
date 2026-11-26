@@ -5,7 +5,7 @@
 > - The memory store runs only as a child of your supervisor: `memory.start` and `memory.stop` are removed.
 > - Recovery handles are bound to a store incarnation: an issue handle kept across a memory store restart ends as `IssueExpired`. The memory store's clock never moves backward.
 > - `delivery.Receipt` has a new first field, `message_id`, and `mime.render` returns a `Rendered` value.
-> - Postmark's refusal of a server token is `NotSent(AuthenticationFailed)`, no longer `Rejected(Permanent)`.
+> - Postmark's refusal of a server token is `NotSent(AuthenticationFailed)`, no longer `Rejected(Permanent)`, unless the response body exceeds the response limit.
 > - The PostgreSQL adapter reports definite storage failures as faults, not `Unknown`.
 > - The adapters (`correio_postgres`, `correio_postmark`, `correio_mailbox`) release next and require Correio 0.2.
 
