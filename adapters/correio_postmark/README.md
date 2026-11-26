@@ -4,6 +4,8 @@
 [![correio on Hex](https://img.shields.io/hexpm/v/correio?label=Hex%3A%20correio)](https://hex.pm/packages/correio)
 [![Gleam](https://img.shields.io/badge/Gleam-FFAFF3?logo=gleam&logoColor=000000)](https://gleam.run/)
 
+> Upgrading from 0.1? See the [migration guide](https://github.com/gleam-dream/correio/blob/main/docs/MIGRATION.md#4-postmark-a-refused-token-is-an-authentication-failure). This adapter requires Correio 0.2.
+
 Sends one Correio message through Postmark's email endpoint. Acceptance rules, limits, and redaction rules are specified in the [delivery design](../../docs/design/design-layer.pdf).
 
 Runnable example: [`test/usage_test.gleam`](test/usage_test.gleam) sends through a local scripted peer in this package's tests. The snippet below mirrors it.
@@ -14,7 +16,7 @@ Add Correio and HTTP Gun from Hex and the Postmark adapter from its Git subdirec
 
 ```toml
 [dependencies]
-correio = ">= 0.1.0 and < 0.2.0"
+correio = ">= 0.2.0 and < 0.3.0"
 http_gun = ">= 0.1.0 and < 0.2.0"
 correio_postmark = { git = "https://github.com/gleam-dream/correio.git", ref = "main", path = "adapters/correio_postmark" }
 ```
@@ -57,6 +59,7 @@ let assert delivery.Accepted(receipt) = send(mail())
 <!-- prettier-ignore-end -->
 
 - The application owns the HTTP Gun client and its shutdown. `sender(provider, options)` supplies Correio's common `delivery.Sender` function.
+- HTTP 401 and 403 mean Postmark refused the server token before it processed the message. The sender returns `NotSent(AuthenticationFailed)`, not `Rejected(Permanent)`; treat it as a configuration fault. The receipt's `message_id` is `None` because Postmark writes its own header; its identifier is in `provider_id`.
 - Configure `redact_token` before starting a client or recording. The default redaction policy does not hide the Postmark server token, and recordings also retain message bodies and addresses unless `redaction.with_body` is supplied.
 - `local_test(provider, port)` targets a loopback server, and the client must also allow loopback destinations.
 - Postmark's [email API](https://postmarkapp.com/developer/api/email-api) and [API overview](https://postmarkapp.com/developer/api/overview) define message fields, acceptance responses, and rejection codes.
