@@ -417,11 +417,6 @@ fn response(
   mail: message.Message,
 ) -> delivery.Outcome {
   case status {
-    429 -> delivery.Rejected(delivery.Temporary)
-    // Postmark refuses a missing or wrong server token before it processes the
-    // message, so nothing was submitted and the recipients were not judged.
-    401 | 403 -> delivery.NotSent(delivery.AuthenticationFailed)
-    400 | 404 | 405 | 413 | 415 | 422 -> delivery.Rejected(delivery.Permanent)
     status if status >= 200 && status < 300 -> {
       let decoder = {
         use code <- decode.field("ErrorCode", decode.int)
@@ -445,6 +440,20 @@ fn response(
         _ -> delivery.OutcomeUnknown
       }
     }
+    _ -> status_outcome(status)
+  }
+}
+
+/// The outcome a status carries without its body. Both a read response and a
+/// status HTTP Gun retained after refusing an oversized body use this mapping,
+/// so the body size never changes how a status is reported.
+fn status_outcome(status: Int) -> delivery.Outcome {
+  case status {
+    429 -> delivery.Rejected(delivery.Temporary)
+    // Postmark refuses a missing or wrong server token before it processes the
+    // message, so nothing was submitted and the recipients were not judged.
+    401 | 403 -> delivery.NotSent(delivery.AuthenticationFailed)
+    400 | 404 | 405 | 413 | 415 | 422 -> delivery.Rejected(delivery.Permanent)
     _ -> delivery.OutcomeUnknown
   }
 }
@@ -461,16 +470,8 @@ fn failed(failure: http_error.Failure) -> delivery.Outcome {
       }
     http_error.MaybeSent ->
       case http_error.status(failure) {
-        Some(429) -> delivery.Rejected(delivery.Temporary)
-        Some(400)
-        | Some(401)
-        | Some(403)
-        | Some(404)
-        | Some(405)
-        | Some(413)
-        | Some(415)
-        | Some(422) -> delivery.Rejected(delivery.Permanent)
-        _ -> delivery.OutcomeUnknown
+        Some(status) -> status_outcome(status)
+        None -> delivery.OutcomeUnknown
       }
   }
 }
