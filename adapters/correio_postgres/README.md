@@ -4,6 +4,8 @@
 [![correio on Hex](https://img.shields.io/hexpm/v/correio?label=Hex%3A%20correio)](https://hex.pm/packages/correio)
 [![Gleam](https://img.shields.io/badge/Gleam-FFAFF3?logo=gleam&logoColor=000000)](https://gleam.run/)
 
+> Upgrading from 0.1? See the [migration guide](https://github.com/gleam-dream/correio/blob/main/docs/MIGRATION.md#5-postgresql-definite-failures-are-faults). This adapter requires Correio 0.2.
+
 Atomic challenge storage through a caller-owned named Pog pool. Semantics, limits, and recovery rules are specified in the [passwordless design](../../docs/design/design-layer.pdf).
 
 Runnable example: [`passwordless_postgres`](../../apps/passwordless_demo/src/usage/passwordless_postgres.gleam), run against a disposable PostgreSQL by the repository gate.
@@ -14,7 +16,7 @@ Add Correio and Pog from Hex and the PostgreSQL adapter from its Git subdirector
 
 ```toml
 [dependencies]
-correio = ">= 0.1.0 and < 0.2.0"
+correio = ">= 0.2.0 and < 0.3.0"
 pog = ">= 4.0.0 and < 5.0.0"
 correio_postgres = { git = "https://github.com/gleam-dream/correio.git", ref = "main", path = "adapters/correio_postgres" }
 ```

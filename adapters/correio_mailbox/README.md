@@ -4,6 +4,8 @@
 [![correio on Hex](https://img.shields.io/hexpm/v/correio?label=Hex%3A%20correio)](https://hex.pm/packages/correio)
 [![Gleam](https://img.shields.io/badge/Gleam-FFAFF3?logo=gleam&logoColor=000000)](https://gleam.run/)
 
+> Upgrading from 0.1? See the [migration guide](https://github.com/gleam-dream/correio/blob/main/docs/MIGRATION.md#2-adapter-dependency-ranges). This adapter requires Correio 0.2.
+
 A read-only HTTP handler that lists and shows the messages in a caller-owned capture. Behavior, limits, and the preview rules are specified in the [delivery design](../../docs/design/design-layer.pdf).
 
 Runnable example: [`development_mailbox`](../../apps/passwordless_demo/src/usage/development_mailbox.gleam), run by the repository gate.
@@ -14,7 +16,7 @@ Add Correio from Hex and the mailbox adapter from its Git subdirectory:
 
 ```toml
 [dependencies]
-correio = ">= 0.1.0 and < 0.2.0"
+correio = ">= 0.2.0 and < 0.3.0"
 correio_mailbox = { git = "https://github.com/gleam-dream/correio.git", ref = "main", path = "adapters/correio_mailbox" }
 ```
 

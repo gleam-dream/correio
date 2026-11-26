@@ -1,5 +1,14 @@
 # Correio
 
+> **Version 0.2.0 is a breaking release.** Read the [migration guide](https://github.com/gleam-dream/correio/blob/main/docs/MIGRATION.md) before upgrading from 0.1.
+>
+> - The memory store runs only as a child of your supervisor: `memory.start` and `memory.stop` are removed.
+> - Recovery handles are bound to a store incarnation: an issue handle kept across a memory store restart ends as `IssueExpired`. The memory store's clock never moves backward.
+> - `delivery.Receipt` has a new first field, `message_id`, and `mime.render` returns a `Rendered` value.
+> - Postmark's refusal of a server token is `NotSent(AuthenticationFailed)`, no longer `Rejected(Permanent)`.
+> - The PostgreSQL adapter reports definite storage failures as faults, not `Unknown`.
+> - The adapters (`correio_postgres`, `correio_postmark`, `correio_mailbox`) release next and require Correio 0.2.
+
 [![CI](https://github.com/gleam-dream/correio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gleam-dream/correio/actions/workflows/ci.yml)
 [![correio on Hex](https://img.shields.io/hexpm/v/correio?label=Hex%3A%20correio)](https://hex.pm/packages/correio)
 [![Gleam](https://img.shields.io/badge/Gleam-FFAFF3?logo=gleam&logoColor=000000)](https://gleam.run/)
@@ -146,7 +155,7 @@ For Postmark, add token redaction before starting the caller-owned HTTP client. 
 
 ## Important behavior
 
-- `Accepted` means the provider accepted the submission; it does not confirm inbox delivery. `OutcomeUnknown` means submission may have occurred, so do not retry it automatically.
+- `Accepted` means the provider accepted the submission; it does not confirm inbox delivery. SMTP and capture receipts carry the `Message-ID` header value (`receipt.message_id`) for matching later bounces and replies; it does not deduplicate sends. `OutcomeUnknown` means submission may have occurred, so do not retry it automatically.
 - Captured messages can contain login links, codes, addresses, and blind recipients. Mount the mailbox only in development and put it behind application access control.
 - Memory storage is bounded, runs only as a child of the application's supervisor (`memory.supervised`), and is reached by the name it was registered under (`memory.store`). A restart empties it. A full memory store discards expired, unconsumed challenges to admit new ones and removes rows past retention on its own timer; rate-limit issuance in the application. The PostgreSQL adapter requires explicit migration and cleanup; the application owns the pool.
 - Keep a challenge operation's recovery handle when its outcome is unknown and resolve that operation through `recover_issue`, `recover_verify`, or `recover_revoke`.
