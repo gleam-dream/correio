@@ -28,7 +28,7 @@
 - When updating dependency pins, reconcile affected `manifest.toml` files in examples, consumers and nested packages through Gleam, then run the full repository gate; updating the root lock alone is insufficient.
 
 - `nix develop` supplies Gleam, Erlang/OTP 29, rebar3, Elixir, Python, PostgreSQL, Node, and lefthook. Linux shells also supply Chromium for browser checks.
-- `nix develop -c scripts/check` runs application compilation and tests for the package, both adapters, and the consumer (including every usage example), then comparison tests and `scripts/e2e`.
+- `nix develop -c scripts/check` first runs `scripts/check-siblings`, which resolves each adapter beside the newest Hex release of `correio` and `http_gun`, then runs application compilation and tests for the package, both adapters, and the consumer (including every usage example), then comparison tests and `scripts/e2e`.
 - `nix develop -c scripts/e2e` runs the native SMTP, HTTP-provider, PostgreSQL fault, and browser-consumer suites. `scripts/browser-e2e` runs the Chromium check alone.
 - `nix develop -c scripts/oracles` runs the pinned oracle comparisons (see `docs/ORACLE.md`). `nix develop -c scripts/benchmark` runs the benchmarks, which impose no threshold and never gate a change (see `docs/BENCHMARKS.md`).
 - `scripts/with-postgres.sh CMD...` runs a command against a disposable PostgreSQL.

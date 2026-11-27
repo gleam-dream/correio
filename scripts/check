@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+scripts/check-siblings
 for package in . adapters/correio_postgres adapters/correio_postmark adapters/correio_mailbox apps/passwordless_demo; do
   (
     cd "$package"
