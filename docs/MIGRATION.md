@@ -75,11 +75,11 @@ correio = ">= 0.2.0 and < 0.3.0"
 
 Change the range in your `gleam.toml`, then run `gleam deps update correio correio_postmark` (a project that installs the Postmark adapter) and commit `manifest.toml`. Add each adapter your project installs to that command instead, using the dependency name from its install line: a locked adapter at its 0.1 revision requires Correio 0.1 and blocks the update unless it is unlocked too. Adapters install from Git subdirectories until they are on Hex; the install lines in each adapter README show the current form.
 
-`correio_postmark` 0.3.0 requires HTTP Gun 0.4. Version 0.2.0 required `http_gun >= 0.1.0 and < 0.2.0`, so it could not resolve in an application that uses any other gleam-dream library on HTTP Gun 0.4. Its configuration takes an `http_gun.Client` and an `http_gun/redaction.Redaction`, so the application's own HTTP Gun client moves to 0.4 with it:
+`correio_postmark` 0.2.0 requires HTTP Gun 0.4. Version 0.1 required `http_gun >= 0.1.0 and < 0.2.0`, so it could not resolve in an application that uses any other gleam-dream library on HTTP Gun 0.4. Its configuration takes an `http_gun.Client` and an `http_gun/redaction.Redaction`, so the application's own HTTP Gun client moves to 0.4 with it:
 
 ```toml
 http_gun = ">= 0.4.0 and < 0.5.0"
-correio_postmark = { git = "https://github.com/gleam-dream/correio.git", ref = "correio_postmark-v0.3.0", path = "adapters/correio_postmark" }
+correio_postmark = { git = "https://github.com/gleam-dream/correio.git", ref = "correio_postmark-v0.2.0", path = "adapters/correio_postmark" }
 ```
 
 Run `gleam deps update http_gun correio_postmark`, then follow the [HTTP Gun migration guide](https://github.com/gleam-dream/http_gun/blob/main/docs/MIGRATION.md) for the code that starts and configures the client. The adapter's own calls keep their behavior: `postmark.deadline` still bounds each submission, a submission that passes that deadline after its request may have been written returns `OutcomeUnknown`, and every status keeps its mapping.
