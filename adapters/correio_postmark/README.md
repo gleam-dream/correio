@@ -4,7 +4,7 @@
 [![correio on Hex](https://img.shields.io/hexpm/v/correio?label=Hex%3A%20correio)](https://hex.pm/packages/correio)
 [![Gleam](https://img.shields.io/badge/Gleam-FFAFF3?logo=gleam&logoColor=000000)](https://gleam.run/)
 
-> Upgrading from 0.2? This adapter requires HTTP Gun 0.4, so raise `http_gun` to `>= 0.4.0 and < 0.5.0` together with the adapter's tag, and follow the [HTTP Gun migration guide](https://github.com/gleam-dream/http_gun/blob/main/docs/MIGRATION.md) for your own client setup. See [section 2 of the migration guide](https://github.com/gleam-dream/correio/blob/main/docs/MIGRATION.md#2-adapter-dependency-ranges).
+> Upgrading from 0.1? This adapter requires HTTP Gun 0.4, so raise `http_gun` to `>= 0.4.0 and < 0.5.0` together with the adapter's tag, and follow the [HTTP Gun migration guide](https://github.com/gleam-dream/http_gun/blob/main/docs/MIGRATION.md) for your own client setup. See [section 2 of the migration guide](https://github.com/gleam-dream/correio/blob/main/docs/MIGRATION.md#2-adapter-dependency-ranges).
 >
 > Upgrading from 0.1? See the [migration guide](https://github.com/gleam-dream/correio/blob/main/docs/MIGRATION.md#4-postmark-a-refused-token-is-an-authentication-failure). This adapter requires Correio 0.2.
 
@@ -20,7 +20,7 @@ Add Correio and HTTP Gun from Hex and the Postmark adapter from its Git subdirec
 [dependencies]
 correio = ">= 0.2.0 and < 0.3.0"
 http_gun = ">= 0.4.0 and < 0.5.0"
-correio_postmark = { git = "https://github.com/gleam-dream/correio.git", ref = "correio_postmark-v0.3.0", path = "adapters/correio_postmark" }
+correio_postmark = { git = "https://github.com/gleam-dream/correio.git", ref = "correio_postmark-v0.2.0", path = "adapters/correio_postmark" }
 ```
 
 Commit `gleam.toml` and `manifest.toml` to retain the resolved versions and Git commit.
